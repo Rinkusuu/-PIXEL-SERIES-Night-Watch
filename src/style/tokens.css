@@ -24,6 +24,10 @@
   --amb-ink-soft: #9aa5a8;
   --amb-lum: 0.22;
 
+  /* Text on a key-light fill. Must stay dark and fixed: the fill is always the
+     brightest thing on screen, so this never inherits from the ambient roles. */
+  --ink-on-glow: #10121f;
+
   /* Rare accents (addendum §D) */
   --acc-blood: #8c2f3a;
   --acc-brass: #b08d57;
