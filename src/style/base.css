@@ -1,0 +1,67 @@
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--amb-deep);
+  color: var(--amb-ink);
+  font-family: var(--font-body);
+  font-size: var(--fs-small);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  text-rendering: optimizeSpeed;
+  overflow-x: hidden;
+}
+
+/* World layer sits behind everything and never scrolls with content. */
+.world {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: block;
+}
+
+/* Chrome layer */
+.app {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--px6);
+  padding: var(--px5) clamp(var(--px3), 3vw, var(--px8)) var(--px5);
+  max-width: 1680px;
+  margin-inline: auto;
+  min-height: 100%;
+}
+@media (min-width: 2100px) { .app { max-width: 1880px; } }
+
+/* Atmosphere — both pointer-transparent, both fixed above the world.
+   Scanlines belong to the CHROME layer per addendum §C.3; the paper grain
+   belongs to the WORLD layer, so it sits below z-index 1. */
+.grain {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: var(--grain-uri);
+  background-size: 128px 128px;
+}
+.scanlines {
+  position: fixed; inset: 0; z-index: 2; pointer-events: none;
+  opacity: 0.035;
+  background: repeating-linear-gradient(to bottom, #fff 0 1px, transparent 1px 3px);
+  mix-blend-mode: overlay;
+}
+.vignette {
+  position: fixed; inset: 0; z-index: 2; pointer-events: none;
+  background: radial-gradient(118% 90% at 50% 42%,
+    transparent 42%, rgb(4 4 14 / .32) 78%, rgb(3 3 10 / .62) 100%);
+}
+
+:focus-visible {
+  outline: var(--px) solid var(--amb-accent);
+  outline-offset: var(--px);
+  border-radius: 2px;
+}
+::selection {
+  background: color-mix(in oklab, var(--amb-accent) 55%, transparent);
+  color: #0b0d1c;
+}

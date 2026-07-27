@@ -1,0 +1,72 @@
+@font-face {
+  font-family: 'Press Start 2P';
+  src: url('/fonts/press-start-2p-latin.woff2') format('woff2');
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+2013-2014, U+2018-201A, U+201C-201E, U+2026, U+2718, U+2766;
+}
+@font-face {
+  font-family: 'Silkscreen';
+  src: url('/fonts/silkscreen-latin.woff2') format('woff2');
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+2013-2014, U+2018-201A, U+201C-201E, U+2026, U+2718, U+2766;
+}
+
+:root {
+  /* Ambient — overwritten at 4 Hz by src/ambient/driver.ts.
+     These literals are the at:0.00 keyframe, so a boot before the first
+     write already looks correct rather than unstyled. */
+  --amb-deep: #0e1218;
+  --amb-mid: #243039;
+  --amb-lift: #4a6070;
+  --amb-glow: #ffb347;
+  --amb-accent: #6f8f9c;
+  --amb-ink: #ece4d8;
+  --amb-ink-soft: #9aa5a8;
+  --amb-lum: 0.22;
+
+  /* Rare accents (addendum §D) */
+  --acc-blood: #8c2f3a;
+  --acc-brass: #b08d57;
+  --acc-dusk: #7d6b8a;
+
+  /* Glass — derived, never hand-set */
+  --glass-bg: color-mix(in oklab, var(--amb-deep) 86%, transparent);
+  --glass-hi: color-mix(in oklab, #ffffff 14%, transparent);
+  --glass-lo: color-mix(in oklab, #000000 30%, transparent);
+  --glass-edge: color-mix(in oklab, var(--amb-mid) 88%, #000 12%);
+  --glass-blur: 18px;
+
+  /* Pixel geometry */
+  --px: 4px;  --px2: 8px;  --px3: 12px; --px4: 16px;
+  --px5: 20px; --px6: 24px; --px8: 32px;
+
+  /* Type */
+  --font-display: 'Press Start 2P', 'Silkscreen', ui-monospace, monospace;
+  --font-ui: 'Silkscreen', 'Press Start 2P', ui-monospace, monospace;
+  --font-body: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
+
+  --fs-nano: 10px; --fs-micro: 11px; --fs-small: 13px;
+  --fs-base: 15px; --fs-lg: 18px; --fs-xl: 24px;
+
+  /* Motion */
+  --motion: 1;
+  --ease-spring: linear(
+    0, 0.006, 0.025 2.8%, 0.101 6.1%, 0.539 18.9%, 0.721 25.3%, 0.849 31.5%,
+    0.937 38.1%, 0.968 41.8%, 0.991 45.7%, 1.006 50.1%, 1.015 55%, 1.017 63.9%, 1.001
+  );
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-snap: cubic-bezier(0.2, 0.9, 0.2, 1.05);
+  --dur-fast: 140ms; --dur: 260ms; --dur-slow: 520ms;
+
+  /* Elevation */
+  --shadow-rest: 0 10px 26px -10px rgb(0 0 0 / .55), 0 2px 0 0 rgb(0 0 0 / .28);
+  --shadow-lift: 0 22px 46px -14px rgb(0 0 0 / .62), 0 3px 0 0 rgb(0 0 0 / .30);
+  --halo: 0 0 var(--px5) color-mix(in oklab, var(--amb-glow) 38%, transparent);
+
+  /* Paper grain, replaced at boot by src/world/grain.ts */
+  --grain-uri: none;
+}
+
+@media (prefers-reduced-motion: reduce) { :root { --motion: 0; } }
+:root[data-motion='off'] { --motion: 0; }
+:root[data-motion='on']  { --motion: 1; }
