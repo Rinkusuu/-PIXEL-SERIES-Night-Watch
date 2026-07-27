@@ -28,9 +28,11 @@ export function App() {
             remainingMs={nw.remainingMs}
             quarryName={selected?.name ?? null}
             bloodmoon={nw.grades.includes('bloodmoon')}
+            motionSetting={nw.data.settings.motion}
             onStart={nw.actions.start}
             onStop={nw.actions.stop}
             onSkip={nw.actions.skip}
+            onCycleMotion={nw.actions.cycleMotion}
           />
           <TheQuarry
             quarry={nw.data.quarry}

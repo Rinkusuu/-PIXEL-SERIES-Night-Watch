@@ -9,6 +9,7 @@ import { minutesByNight } from '../session/aggregate';
 import { streakLength } from '../session/streak';
 import { load, save } from '../store/persist';
 import type { Schema } from '../store/schema';
+import { motionValue, nextMotion } from './motion';
 
 const BLOODMOON_STREAK = 5;
 const PRESSED_MS = 5 * 60_000;
@@ -78,9 +79,10 @@ export function useNightWatch() {
     }),
   []);
 
-  const motion = data.settings.motion === 'off' ? 0
-    : data.settings.motion === 'on' ? 1
-    : window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 1;
+  const motion = motionValue(
+    data.settings.motion,
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  );
 
   useEffect(() => {
     document.documentElement.dataset.motion = data.settings.motion;
@@ -132,11 +134,9 @@ export function useNightWatch() {
       return next;
     }),
     cycleMotion: () => setData((d) => {
-      const order = ['auto', 'on', 'off'] as const;
-      const i = order.indexOf(d.settings.motion);
       const next: Schema = {
         ...d,
-        settings: { ...d.settings, motion: order[(i + 1) % order.length]! },
+        settings: { ...d.settings, motion: nextMotion(d.settings.motion) },
       };
       save(next);
       return next;
