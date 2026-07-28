@@ -1,18 +1,23 @@
 import { useEffect, useRef } from 'react';
 import type { AmbientValues } from '../ambient/types';
+import type { Weather } from './weather';
+import { defaultDeckTop } from './horizon';
 import { createWorldRenderer } from './renderer';
 
 type Props = {
   values: AmbientValues;
   progress: number;
   motion: number;
+  weather: Weather;
+  /** Top of the glass panel row, in CSS pixels. The balustrade lands here. */
+  deckTop: number;
 };
 
-export function World({ values, progress, motion }: Props) {
+export function World({ values, progress, motion, weather, deckTop }: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
   // Read through a ref so the rAF loop is started exactly once.
-  const latest = useRef({ values, progress, motion });
-  latest.current = { values, progress, motion };
+  const latest = useRef({ values, progress, motion, weather, deckTop });
+  latest.current = { values, progress, motion, weather, deckTop };
 
   useEffect(() => {
     const cv = ref.current;
@@ -45,7 +50,16 @@ export function World({ values, progress, motion }: Props) {
 
     const loop = (t: number) => {
       const s = latest.current;
-      renderer.frame(g, w, h, s.values, s.progress, t, s.motion);
+      renderer.frame(g, {
+        w,
+        h,
+        deckTop: s.deckTop || defaultDeckTop(h),
+        v: s.values,
+        progress: s.progress,
+        timeMs: t,
+        motion: s.motion,
+        weather: s.weather,
+      });
       raf = requestAnimationFrame(loop);
     };
 
