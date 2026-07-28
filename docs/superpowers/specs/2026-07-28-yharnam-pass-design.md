@@ -278,9 +278,17 @@ city            menara lebih tinggi daripada lebarnya melewati rasio minimum;
                 pita belakang selalu lebih pucat daripada pita depan
 ```
 
-Seluruh 196 tes yang ada harus tetap hijau. Tes `keyframes.test.ts` yang menegakkan busur
-lama akan gagal dan **harus diperbarui, bukan dihapus** — busurnya berubah arah, tapi tetap
-ada busur untuk ditegakkan.
+Seluruh 196 tes yang ada harus tetap hijau — **termasuk `keyframes.test.ts`**.
+
+Koreksi terhadap perkiraan awal: ketujuh tes di berkas itu ternyata tetap lulus. Tidak satu
+pun menegakkan arah `lum` atau kehangatan langit; yang ditegakkan adalah urutan `at`, jarak
+tak rata, `glow` menguning di 0.62, `glow` dingin hanya di fajar, tidak ada warna jenuh
+penuh, keadaan tergelap tidak runtuh jadi hitam, dan kontras teks. Semuanya masih benar di
+palet baru — sudah dihitung tangan terhadap `resolve()`, termasuk kombinasi
+`pressed + bloodmoon` di 0.85.
+
+Artinya busur lama tidak pernah benar-benar dikunci tes. Tes baru di §10 di ataslah yang
+menguncinya.
 
 ---
 
