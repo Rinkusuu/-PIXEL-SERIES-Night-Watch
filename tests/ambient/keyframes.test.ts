@@ -70,3 +70,50 @@ describe('gradesFor', () => {
     expect(gradesFor(['pressed', 'bloodmoon'])).toEqual([GRADES.pressed, GRADES.bloodmoon]);
   });
 });
+
+describe('the night starts at night', () => {
+  const key = (at: number) => NIGHT_KEYS.find((k) => k.at === at)!;
+  const lum = (hex: string) => luminance(hexToRgb(hex));
+
+  it('has no warm sky anywhere before dawn', () => {
+    // Dusk is gone. The app sits at 0.00 whenever it is idle, so the first
+    // keyframe is the one people actually look at — it has to be the night.
+    for (const k of NIGHT_KEYS.slice(0, -1)) {
+      for (const hex of k.sky) {
+        const [r, , b] = hexToRgb(hex);
+        expect(b, `sky ${hex} at ${k.at}`).toBeGreaterThanOrEqual(r);
+      }
+    }
+  });
+
+  it('ties the fog colour to the horizon, every night key', () => {
+    // accent IS the fog now, and the fog is the brightest mass on screen.
+    // Dawn keeps its own brass accent.
+    for (const k of NIGHT_KEYS.slice(0, -1)) {
+      expect(k.accent, `at ${k.at}`).toBe(k.sky[2]);
+    }
+  });
+
+  it('makes the fog palest at 0.62 — the Yharnam moment', () => {
+    for (const at of [0.00, 0.35, 0.85]) {
+      expect(lum(key(0.62).accent), `vs at ${at}`).toBeGreaterThan(lum(key(at).accent));
+    }
+  });
+
+  it('makes the fog thickest at 0.85, which is a different moment', () => {
+    // fog.ts computes thickness as (1 - lum), so thickest fog means LOWEST lum.
+    // Palest fog and thickest fog are deliberately two separate beats.
+    for (const at of [0.00, 0.35, 0.62]) {
+      expect(key(0.85).lum).toBeLessThan(key(at).lum);
+    }
+  });
+
+  it('falls monotonically through the night, then jumps at dawn', () => {
+    const night = NIGHT_KEYS.slice(0, -1);
+    for (let i = 1; i < night.length; i++) {
+      expect(night[i]!.lum).toBeLessThan(night[i - 1]!.lum);
+    }
+    expect(NIGHT_KEYS[NIGHT_KEYS.length - 1]!.lum)
+      .toBeGreaterThan(NIGHT_KEYS[NIGHT_KEYS.length - 2]!.lum);
+  });
+});
