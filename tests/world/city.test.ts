@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { skyline } from '../../src/world/city';
+import { MIN_SPIRE_ASPECT, SPIRE_MAX_W, skyline, skyline as gen } from '../../src/world/city';
 
 describe('skyline', () => {
   const blocks = skyline(1200, 100, 400, 91);
@@ -45,5 +45,35 @@ describe('skyline', () => {
   it('produces a different city for a different seed', () => {
     const other = skyline(1200, 100, 400, 92);
     expect(other.map((b) => b.kind).join()).not.toBe(blocks.map((b) => b.kind).join());
+  });
+});
+
+describe('gothic verticality', () => {
+  const blocks = gen(1400, 100, 460, 17);
+
+  it('makes every spire taller than it is wide, well past square', () => {
+    // A spire as wide as it is tall is a tent. The reference's towers are needles.
+    // Measured against the SHAFT, not the slot: the massing caps a tower's shaft
+    // at SPIRE_MAX_W however wide a slot the cursor happened to draw for it.
+    for (const b of blocks.filter((v) => v.kind === 'spire' || v.kind === 'clockTower')) {
+      const shaft = Math.min(b.w, SPIRE_MAX_W);
+      expect((460 - b.top) / shaft, `${b.kind} at x=${b.x}`)
+        .toBeGreaterThanOrEqual(MIN_SPIRE_ASPECT);
+    }
+  });
+
+  it('clusters towers into districts instead of sprinkling them evenly', () => {
+    const idx = blocks
+      .map((b, i) => ({ b, i }))
+      .filter(({ b }) => b.kind === 'spire')
+      .map(({ i }) => i);
+    // At least one adjacent pair — a city has tower districts, not one tower
+    // every other block.
+    const adjacent = idx.some((v, k) => k > 0 && v - idx[k - 1]! === 1);
+    expect(adjacent).toBe(true);
+  });
+
+  it('is still deterministic after the change', () => {
+    expect(gen(1400, 100, 460, 17)).toEqual(gen(1400, 100, 460, 17));
   });
 });

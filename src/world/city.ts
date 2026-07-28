@@ -23,12 +23,25 @@ export type Block = {
 const MIN_W = 18;
 const MAX_W = 90;
 
+/**
+ * A spire must be at least this many times taller than it is wide. Below about
+ * 3 the shape reads as a tent; the reference's towers are needles.
+ */
+export const MIN_SPIRE_ASPECT = 3.4;
+
+/**
+ * Spires and towers are capped narrow no matter what width the cursor drew.
+ * Exported so the test can measure the shaft that is actually drawn rather than
+ * the slot it stands in.
+ */
+export const SPIRE_MAX_W = 34;
+
 /** `heightF`: 0 is a low shed, 1 is the tallest thing on the block. */
 function pickKind(r: number, heightF: number): ShapeKind {
   // Cranes and sheds crowd the waterfront; spires and stacks stand behind them.
-  if (heightF < 0.35) return r < 0.35 ? 'crane' : r < 0.75 ? 'gable' : 'flat';
-  if (heightF > 0.82) return r < 0.45 ? 'spire' : r < 0.75 ? 'factory' : 'dome';
-  return r < 0.55 ? 'flat' : r < 0.85 ? 'gable' : 'dome';
+  if (heightF < 0.30) return r < 0.35 ? 'crane' : r < 0.75 ? 'gable' : 'flat';
+  if (heightF > 0.66) return r < 0.58 ? 'spire' : r < 0.80 ? 'factory' : 'dome';
+  return r < 0.48 ? 'flat' : r < 0.80 ? 'gable' : 'dome';
 }
 
 export function skyline(w: number, top: number, bot: number, seed: number): Block[] {
@@ -37,20 +50,51 @@ export function skyline(w: number, top: number, bot: number, seed: number): Bloc
   const out: Block[] = [];
 
   let x = 0;
+  // `run` biases the next block toward the same kind as the last, so towers
+  // arrive in districts. A city with one spire every other block reads as
+  // wallpaper, not as a place.
+  let run = 0;
+  let lastKind: ShapeKind | null = null;
+
   while (x < w) {
     const bw = Math.max(MIN_W, Math.round(MIN_W + r() * (MAX_W - MIN_W)));
-    const heightF = Math.pow(r(), 0.85);
-    out.push({
-      kind: pickKind(r(), heightF),
-      x,
-      w: bw,
-      top: Math.round(bot - span * (0.18 + heightF * 0.82)),
-    });
-    x += bw;
+    const heightF = Math.pow(r(), 0.62);
+    const roll = r();
+
+    // Annotated: without it TS infers `kind` through `lastKind`, which is
+    // assigned from `kind` further down — a circular initializer (TS7022).
+    const kind: ShapeKind = run > 0 && lastKind !== null && roll < 0.62
+      ? lastKind
+      : pickKind(roll, heightF);
+
+    // Towers are needles. Capping the width here rather than inside the massing
+    // keeps the cursor's coverage of `w` exact.
+    const narrow = kind === 'spire' || kind === 'clockTower';
+    const width = narrow ? Math.min(bw, SPIRE_MAX_W) : bw;
+
+    // Guarantee the aspect ratio instead of hoping a random height clears it.
+    // `floor`, not `round`: rounding down the top means rounding UP the height,
+    // so the ratio can only ever land above the minimum, never a hair below it.
+    let blockTop = Math.round(bot - span * (0.18 + heightF * 0.82));
+    if (narrow) {
+      blockTop = Math.min(blockTop, Math.floor(bot - width * MIN_SPIRE_ASPECT));
+      if (blockTop < top) blockTop = top;
+    }
+
+    out.push({ kind, x, w: width, top: blockTop });
+
+    run = kind === lastKind ? run - 1 : (narrow ? 2 : 0);
+    lastKind = kind;
+    x += width;
   }
 
   // The landmark goes on the widest block, so it always has room for its shaft.
   // Deterministic, and it reads as deliberate rather than as an accident.
+  //
+  // Its slot width is left alone on purpose: the coverage test asserts every
+  // block's `x` equals the running sum of the widths before it, so shrinking one
+  // after the fact would put every later block out of step. The massing already
+  // draws the tower's shaft narrow inside a wide slot.
   let widest = 0;
   for (let i = 1; i < out.length; i++) if (out[i]!.w > out[widest]!.w) widest = i;
   out[widest]!.kind = 'clockTower';
