@@ -4,6 +4,7 @@ import type { Horizon } from './horizon';
 import type { LampSpot } from './water';
 import type { WeatherFx } from './weather';
 import { piers } from './bridge';
+import { lanternAnchor } from './foreground';
 
 const TOTAL_LAMPS = 14;
 
@@ -84,11 +85,18 @@ export function lampSpots(
     });
   }
 
-  // The near lantern never goes out, at any state. Addendum §D.1.
-  out.push({ x: Math.round(w * 0.08), y: hz.deckTop - 26, r: 4, lit: true, kind: 'lantern' });
+  // The near lantern never goes out, at any state. Addendum §D.1. Its position
+  // comes from foreground.ts so the flame lands inside the glass housing that
+  // module draws — one source, not two that can drift apart.
+  const lantern = lanternAnchor(w, hz);
+  out.push({ x: lantern.x, y: lantern.y, r: 5, lit: true, kind: 'lantern' });
 
   out.push({
-    x: Math.round(moon.x), y: Math.round(moon.y), r: 16 * fx.moonScale, lit: true, kind: 'moon',
+    // The moon is the picture's key light, not a decoration in the corner. At
+    // r16 it read as a sticker; this is the size it has to be to justify the
+    // reflection column it drops down the whole river.
+    x: Math.round(moon.x), y: Math.round(moon.y), r: 30 * fx.moonScale,
+    lit: true, kind: 'moon',
   });
 
   return out;
@@ -109,11 +117,18 @@ function glowBlob(
   g.fill();
 }
 
+/**
+ * The moon's disc. Fixed, like `VIGNETTE_INK` in ladder.ts and for the same
+ * reason: it is the TOP of the value range, and a top that drifts with the
+ * ambient palette is not a top.
+ */
+const MOON_DISC = '#f4f7f4';
+
 const HALO: Record<LampSpot['kind'], number> = {
-  window: 8, bridge: 12, street: 15, lantern: 22, moon: 4.4,
+  window: 8, bridge: 12, street: 15, lantern: 20, moon: 3.6,
 };
 const ALPHA: Record<LampSpot['kind'], number> = {
-  window: 0.34, bridge: 0.34, street: 0.30, lantern: 0.55, moon: 0.18,
+  window: 0.34, bridge: 0.34, street: 0.30, lantern: 0.55, moon: 0.30,
 };
 
 export function drawLamps(
@@ -135,8 +150,10 @@ export function drawLamps(
 
     if (s.kind === 'moon') {
       glowBlob(g, s.x, s.y, rad * HALO.moon, v.glow, ALPHA.moon + v.lum * 0.1 + fx.lumLift);
-      g.globalAlpha = 0.3 + v.lum * 0.18 + fx.lumLift;
-      g.fillStyle = v.glow;
+      // A hard, near-white disc. A soft dim one reads as a smudge, and the
+      // reference's moon is the brightest thing on screen by a wide margin.
+      g.globalAlpha = Math.min(1, 0.62 + v.lum * 0.3 + fx.lumLift);
+      g.fillStyle = MOON_DISC;
       g.beginPath();
       g.arc(s.x, s.y, rad, 0, Math.PI * 2);
       g.fill();
