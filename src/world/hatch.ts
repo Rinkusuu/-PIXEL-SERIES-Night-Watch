@@ -5,7 +5,18 @@
  * Angle marks DEPTH, not object — everything at the same distance shares one
  * angle, or the picture reads as matted fur.
  */
-export const HATCH_ANGLES = { far: -0.42, mid: -0.95, near: 0.30 } as const;
+export const HATCH_ANGLES = {
+  far: -0.42,
+  mid: -0.95,
+  near: 0.30,
+  /**
+   * Dead flat. Not a free choice: horizontal line work is how nineteenth-century
+   * engraving draws water, and it is what makes the river read as a horizontal
+   * surface instead of a vertical wall. The upstream bridge shares `mid` — its
+   * depth really is there, and a fifth angle would only blur the depth ladder.
+   */
+  water: 0.00,
+} as const;
 
 export type HatchOpts = {
   angle?: number;

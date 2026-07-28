@@ -99,3 +99,20 @@ describe('hatch', () => {
     expect(new Set(values).size).toBe(values.length);
   });
 });
+
+describe('HATCH_ANGLES', () => {
+  it('locks one angle per depth, water included', () => {
+    expect(Object.keys(HATCH_ANGLES).sort()).toEqual(['far', 'mid', 'near', 'water']);
+  });
+
+  it('draws water dead flat', () => {
+    // Flat horizontal lines are the nineteenth-century engraver's convention for
+    // water. Any other angle and the river reads as a wall.
+    expect(HATCH_ANGLES.water).toBe(0);
+  });
+
+  it('gives every depth a distinct angle', () => {
+    const values = Object.values(HATCH_ANGLES);
+    expect(new Set(values).size).toBe(values.length);
+  });
+});
