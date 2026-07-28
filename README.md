@@ -22,6 +22,7 @@ Fonts are self-hosted and are **not** committed. See
 ## Design
 
 - Spec: `docs/superpowers/specs/2026-07-27-night-watch-design.md`
+- Scene spec: `docs/superpowers/specs/2026-07-28-river-scene-design.md`
 - Style addendum (shared with two sibling projects): `../Ideas/gaslamp-dna.md`
 - Style parent: `../Useless Dashboard/DNA.md`
 
@@ -29,6 +30,21 @@ Two rendering layers that never mix: an engraved `<canvas>` world at full
 resolution, and pixel-glass DOM chrome on a 4px grid. They share one thing — the
 ambient palette written to CSS custom properties at 4 Hz. Read addendum §B
 before changing either.
+
+### The world layer
+
+Every composition line lives in `src/world/horizon.ts`. No other module may
+compute a fraction of the frame height — there is a test in `tests/smoke.test.ts`
+that enforces it, because `layers.ts` and `bloom.ts` had already drifted to two
+disagreeing copies of the same number.
+
+The balustrade is drawn at the panel row's **measured** position, read by a
+`ResizeObserver` in `App.tsx`, so the glass genuinely rests on the parapet at
+every viewport size rather than at the one it was tuned on.
+
+Each night's weather (`clear` / `fog` / `rain` / `fullmoon`) is rolled
+deterministically from the same `nightKey()` the streak counts by, so a night
+never reshuffles on a resize.
 
 ## Testing policy
 
