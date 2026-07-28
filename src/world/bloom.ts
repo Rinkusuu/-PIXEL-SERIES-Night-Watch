@@ -1,11 +1,15 @@
 import type { AmbientValues } from '../ambient/types';
-import { roofline, type Building } from './layers';
+import type { Block } from './city';
+import type { Horizon } from './horizon';
+import type { LampSpot } from './water';
+import type { WeatherFx } from './weather';
+import { piers } from './bridge';
 
 const TOTAL_LAMPS = 14;
 
 /**
- * Windows and lamps light up through the evening and go out toward dawn.
- * Peak is at 0.62 — the thickest fog, when the gas is doing the most work.
+ * Windows and lamps light up through the evening and go out toward dawn. Peak is
+ * at 0.62 — the thickest fog, when the gas is doing the most work.
  */
 export function lampCount(progress: number, total = TOTAL_LAMPS): number {
   const p = Math.min(1, Math.max(0, progress));
@@ -14,25 +18,79 @@ export function lampCount(progress: number, total = TOTAL_LAMPS): number {
   return Math.max(1, Math.min(total, Math.round(n)));
 }
 
+export function moonPos(w: number, hz: Horizon, progress: number): { x: number; y: number } {
+  return {
+    x: w * 0.78,
+    y: hz.skyBot - progress * (hz.skyBot - hz.cityTop * 0.4),
+  };
+}
+
 /**
- * Windows sit inside real buildings, not scattered over the sky. The order is
- * shuffled by a co-prime stride so the ones that light up first are spread
- * across the skyline instead of marching in from one edge.
+ * ONE list of lights, consumed by both the bloom pass and the river's glitter
+ * columns. Two lists computed separately is how you get a reflection that does
+ * not line up with the lamp casting it.
  */
-export function windowSpots(buildings: readonly Building[]): { x: number; y: number; r: number }[] {
-  const n = buildings.length;
-  const stride = 5; // co-prime with 14
-  const out: { x: number; y: number; r: number }[] = [];
-  for (let k = 0; k < n; k++) {
-    const i = (k * stride) % n;
-    const b = buildings[i];
+export function lampSpots(
+  w: number,
+  hz: Horizon,
+  blocks: readonly Block[],
+  progress: number,
+  fx: WeatherFx,
+  moon: { x: number; y: number },
+): LampSpot[] {
+  const out: LampSpot[] = [];
+  const n = lampCount(progress);
+
+  // Windows, spread by a co-prime stride so the ones that light first are
+  // scattered across the skyline instead of marching in from one edge.
+  const tall = blocks.filter((b) => b.kind !== 'crane');
+  const stride = 5;
+  for (let k = 0; k < tall.length; k++) {
+    const i = (k * stride) % tall.length;
+    const b = tall[i]!;
     if (!b) continue;
     out.push({
-      x: b.x + b.w * (0.3 + ((i * 7) % 5) / 12),
-      y: b.y + 14 + ((i * 11) % 4) * 9,
+      x: Math.round(b.x + b.w * (0.3 + ((i * 7) % 5) / 12)),
+      // Clamped into the building. A short warehouse is shorter than the window
+      // ladder, and an unclamped window would sit on the water in front of it.
+      y: Math.round(Math.max(b.top + 4, Math.min(b.top + 12 + ((i * 11) % 4) * 9, hz.cityBot - 6))),
       r: 2 + (i % 2),
+      lit: k < n,
+      kind: 'window',
     });
   }
+
+  // Gas standards on the bridge piers. These are the lights the river reflects
+  // best, because they sit directly above it.
+  const p = piers(w, hz);
+  for (const [i, q] of p.entries()) {
+    out.push({
+      x: Math.round(q.x + q.w / 2),
+      y: hz.bridgeTop - 9,
+      r: 3,
+      lit: i < Math.max(1, Math.round((n / TOTAL_LAMPS) * p.length)),
+      kind: 'bridge',
+    });
+  }
+
+  // Street standards along the near rail.
+  for (let k = 0; k < 5; k++) {
+    out.push({
+      x: Math.round(w * (0.18 + k * 0.19)),
+      y: hz.railTop - 6,
+      r: 3,
+      lit: k < Math.max(1, Math.round((n / TOTAL_LAMPS) * 5)),
+      kind: 'street',
+    });
+  }
+
+  // The near lantern never goes out, at any state. Addendum §D.1.
+  out.push({ x: Math.round(w * 0.08), y: hz.deckTop - 26, r: 4, lit: true, kind: 'lantern' });
+
+  out.push({
+    x: Math.round(moon.x), y: Math.round(moon.y), r: 16 * fx.moonScale, lit: true, kind: 'moon',
+  });
+
   return out;
 }
 
@@ -40,6 +98,7 @@ function glowBlob(
   g: CanvasRenderingContext2D,
   x: number, y: number, radius: number, colour: string, alpha: number,
 ): void {
+  if (radius <= 0) return;
   const halo = g.createRadialGradient(x, y, 0, x, y, radius);
   halo.addColorStop(0, colour);
   halo.addColorStop(1, 'transparent');
@@ -50,71 +109,44 @@ function glowBlob(
   g.fill();
 }
 
+const HALO: Record<LampSpot['kind'], number> = {
+  window: 8, bridge: 12, street: 15, lantern: 22, moon: 4.4,
+};
+const ALPHA: Record<LampSpot['kind'], number> = {
+  window: 0.34, bridge: 0.34, street: 0.30, lantern: 0.55, moon: 0.18,
+};
+
 export function drawLamps(
   g: CanvasRenderingContext2D,
-  w: number,
-  h: number,
   v: AmbientValues,
-  progress: number,
+  lamps: readonly LampSpot[],
+  fx: WeatherFx,
   timeMs: number,
   motion: number,
 ): void {
-  const n = lampCount(progress);
-  const spots = windowSpots(roofline(w, h));
-
   // Emissive things are HOLES in the hatching, drawn after it. If everything
   // glowed, nothing would. Addendum §C.2.
   g.save();
   g.globalCompositeOperation = 'lighter';
-  for (let i = 0; i < n && i < spots.length; i++) {
-    const s = spots[i]!;
+  for (const [i, s] of lamps.entries()) {
+    if (!s.lit) continue;
     const pulse = 1 + Math.sin(timeMs / 900 + i) * 0.06 * motion;
     const rad = s.r * pulse;
-    glowBlob(g, s.x, s.y, rad * 8, v.glow, 0.34);
+
+    if (s.kind === 'moon') {
+      glowBlob(g, s.x, s.y, rad * HALO.moon, v.glow, ALPHA.moon + v.lum * 0.1 + fx.lumLift);
+      g.globalAlpha = 0.3 + v.lum * 0.18 + fx.lumLift;
+      g.fillStyle = v.glow;
+      g.beginPath();
+      g.arc(s.x, s.y, rad, 0, Math.PI * 2);
+      g.fill();
+      continue;
+    }
+
+    glowBlob(g, s.x, s.y, rad * HALO[s.kind] * fx.haloScale, v.glow, ALPHA[s.kind]);
     g.globalAlpha = 1;
     g.fillStyle = v.glow;
-    g.fillRect(s.x - rad, s.y - rad * 1.4, rad * 2, rad * 2.8);
+    g.fillRect(s.x - rad / 2, s.y - rad, Math.max(2, rad), rad * 2.4);
   }
-  g.restore();
-
-  // A row of street lamps along the near railing, thinning out with distance.
-  const streetY = h * 0.855;
-  g.save();
-  g.globalCompositeOperation = 'lighter';
-  for (let k = 0; k < 5; k++) {
-    const x = w * (0.18 + k * 0.19);
-    const lit = k < Math.max(1, Math.round((n / TOTAL_LAMPS) * 5));
-    if (!lit) continue;
-    const pulse = 1 + Math.sin(timeMs / 1100 + k * 2) * 0.05 * motion;
-    glowBlob(g, x, streetY, 46 * pulse, v.glow, 0.3);
-    g.globalAlpha = 1;
-    g.fillStyle = v.glow;
-    g.fillRect(x - 2, streetY - 5, 4, 10);
-  }
-  g.restore();
-
-  // The near lantern never goes out, at any state. Addendum §D.1.
-  const lx = w * 0.08;
-  const ly = h * 0.74;
-  g.save();
-  g.globalCompositeOperation = 'lighter';
-  glowBlob(g, lx, ly, 90, v.glow, 0.55);
-  g.globalAlpha = 1;
-  g.fillStyle = v.glow;
-  g.fillRect(lx - 3, ly - 6, 6, 12);
-  g.restore();
-
-  // Moon: rises with the night. Given a soft halo so it reads as light rather
-  // than as a sticker pasted on the sky.
-  const my = h * (0.42 - progress * 0.24);
-  const mx = w * 0.78;
-  g.save();
-  g.globalCompositeOperation = 'lighter';
-  glowBlob(g, mx, my, 70, v.glow, 0.16 + v.lum * 0.1);
-  g.globalAlpha = 0.3 + v.lum * 0.18;
-  g.fillStyle = v.glow;
-  g.beginPath();
-  g.arc(mx, my, 16, 0, Math.PI * 2);
-  g.fill();
   g.restore();
 }
