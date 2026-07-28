@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { channelDrift } from '../../src/world/renderer';
 import { lampCount } from '../../src/world/bloom';
-import { fogOffset } from '../../src/world/fog';
+import { drawFog, fogOffset } from '../../src/world/fog';
+import { horizon } from '../../src/world/horizon';
+import { resolve } from '../../src/ambient/interpolate';
+import { NIGHT_KEYS } from '../../src/ambient/keyframes';
+import { gradesFor } from '../../src/ambient/grade';
 
 describe('channelDrift', () => {
   it('is zero for identical colours', () => {
@@ -49,5 +53,45 @@ describe('fogOffset', () => {
     expect(a).not.toBeCloseTo(b, 3);
     expect(b).not.toBeCloseTo(c, 3);
     expect(Math.sign(a)).not.toBe(Math.sign(b));
+  });
+});
+
+/** Counts every drawing call, so we can assert on work done without a canvas. */
+function countingCtx(): { g: CanvasRenderingContext2D; calls: () => number } {
+  let calls = 0;
+  const grad = { addColorStop: () => {} };
+  const g = new Proxy({} as CanvasRenderingContext2D, {
+    get(_t, key) {
+      if (key === 'createRadialGradient' || key === 'createLinearGradient') {
+        return () => { calls++; return grad; };
+      }
+      return () => { calls++; };
+    },
+    set: () => true,
+  });
+  return { g, calls: () => calls };
+}
+
+describe('drawFog', () => {
+  const v = resolve(NIGHT_KEYS, 0.4, gradesFor(['calm']));
+  const hz = horizon(900, 594);
+
+  it('draws nothing at all when the night has no fog to give', () => {
+    const { g, calls } = countingCtx();
+    drawFog(g, 800, hz, v, 0, 1, 0);
+    expect(calls()).toBe(0);
+  });
+
+  it('works harder on a foggy night than on a clear one', () => {
+    const clear = countingCtx();
+    drawFog(clear.g, 800, hz, v, 0, 1, 1);
+    expect(clear.calls()).toBeGreaterThan(0);
+  });
+
+  it('keeps its bands inside the river and the near stone, never the sky', () => {
+    // Bands are fractions OF THE RIVER now. If they were still fractions of the
+    // frame, moving deckTop would slide the fog onto the sky.
+    expect(hz.waterTop).toBeLessThan(hz.railTop);
+    expect(hz.railTop).toBeLessThan(hz.deckTop);
   });
 });

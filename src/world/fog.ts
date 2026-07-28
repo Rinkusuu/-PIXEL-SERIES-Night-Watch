@@ -1,9 +1,15 @@
 import type { AmbientValues } from '../ambient/types';
+import type { Horizon } from './horizon';
 
+/**
+ * Band positions are fractions OF THE RIVER, not of the frame. Fog belongs to
+ * the water — it rolls off it — so when `deckTop` moves the fog follows the
+ * river instead of drifting onto the stone.
+ */
 const BANDS = [
-  { speed: 0.018, y: 0.60, height: 0.26, alpha: 0.34, puffs: 5 },
-  { speed: -0.011, y: 0.70, height: 0.30, alpha: 0.28, puffs: 4 },
-  { speed: 0.006, y: 0.81, height: 0.24, alpha: 0.22, puffs: 6 },
+  { speed: 0.018, y: 0.10, height: 0.42, alpha: 0.34, puffs: 5 },
+  { speed: -0.011, y: 0.44, height: 0.46, alpha: 0.28, puffs: 4 },
+  { speed: 0.006, y: 0.78, height: 0.40, alpha: 0.22, puffs: 6 },
 ];
 
 /**
@@ -24,29 +30,32 @@ export function fogOffset(timeMs: number, band: number, motion: number): number 
 export function drawFog(
   g: CanvasRenderingContext2D,
   w: number,
-  h: number,
+  hz: Horizon,
   v: AmbientValues,
   timeMs: number,
   motion: number,
+  fogScale: number,
 ): void {
-  // Thicker fog as the world darkens.
-  const thickness = 1 - v.lum;
+  // Thicker fog as the world darkens, and thicker again on a foggy night.
+  const thickness = (1 - v.lum) * fogScale;
   if (thickness <= 0.01) return;
 
+  const top = hz.waterTop;
+  const span = hz.h - hz.waterTop;
+
   BANDS.forEach((b, i) => {
-    const bandY = h * (b.y + b.height / 2);
-    const bandH = h * b.height;
+    const bandY = top + span * (b.y + b.height / 2);
+    const bandH = span * b.height;
     const puffW = w / b.puffs;
-    const span = w + puffW * 2;
+    const wrap = w + puffW * 2;
     const off = fogOffset(timeMs, i, motion);
 
     g.save();
-    g.globalAlpha = b.alpha * thickness;
+    g.globalAlpha = Math.min(0.85, b.alpha * thickness);
 
     for (let k = 0; k < b.puffs + 2; k++) {
-      // Wrap into [-puffW, w + puffW) so puffs enter and leave off-screen.
       const raw = k * puffW + off;
-      const x = ((raw % span) + span) % span - puffW;
+      const x = ((raw % wrap) + wrap) % wrap - puffW;
 
       g.save();
       g.translate(x, bandY);
