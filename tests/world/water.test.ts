@@ -79,3 +79,59 @@ describe('createWater', () => {
     expect(w.rings()[0]!.r).toBe(before);
   });
 });
+
+/**
+ * Records every drawing call so two frames can be compared exactly. Screenshots
+ * caught this bug and the unit tests did not: the ripples, the glitter dashes
+ * and the waterline foam all read `timeMs` directly, so they kept twinkling
+ * after motion was switched off.
+ */
+function recordingCtx(): { g: CanvasRenderingContext2D; log: string[] } {
+  const log: string[] = [];
+  const grad = { addColorStop: (...a: unknown[]) => log.push(`stop(${a.join(',')})`) };
+  const g = new Proxy({} as CanvasRenderingContext2D, {
+    get(_t, key) {
+      if (key === 'createLinearGradient' || key === 'createRadialGradient') {
+        return (...a: unknown[]) => { log.push(`grad(${a.join(',')})`); return grad; };
+      }
+      return (...a: unknown[]) => log.push(`${String(key)}(${a.map(String).join(',')})`);
+    },
+    set(_t, key, value) { log.push(`${String(key)}=${String(value)}`); return true; },
+  });
+  return { g, log };
+}
+
+describe('motion: 0 freezes the river without emptying it', () => {
+  const hz = {
+    h: 900, cityTop: 144, skyBot: 198, cityBot: 360, bridgeTop: 310, bridgeBot: 387,
+    waterTop: 360, waterBot: 540, railTop: 540, railBot: 594, deckTop: 594,
+  };
+  const v = {
+    deep: '#0e1218', mid: '#243039', lift: '#4a6070', glow: '#ffb347',
+    accent: '#6f8f9c', ink: '#ece4d8', inkSoft: '#9aa5a8', lum: 0.22,
+    sky: ['#0e1218', '#243039', '#4a6070'] as const,
+  };
+  const lamps = [
+    { x: 300, y: 300, r: 3, lit: true, kind: 'bridge' as const },
+    { x: 900, y: 190, r: 16, lit: true, kind: 'moon' as const },
+  ];
+
+  const frameAt = (timeMs: number, motion: number) => {
+    const { g, log } = recordingCtx();
+    createWater().draw(g, 1440, hz, v, null, lamps, timeMs, motion, 0);
+    return log.join('\n');
+  };
+
+  it('draws the identical frame at any two moments', () => {
+    expect(frameAt(0, 0)).toBe(frameAt(5_000, 0));
+    expect(frameAt(5_000, 0)).toBe(frameAt(9_999_999, 0));
+  });
+
+  it('still draws a river — frozen is not blank', () => {
+    expect(frameAt(0, 0).length).toBeGreaterThan(2000);
+  });
+
+  it('but does move when motion is on', () => {
+    expect(frameAt(0, 1)).not.toBe(frameAt(5_000, 1));
+  });
+});

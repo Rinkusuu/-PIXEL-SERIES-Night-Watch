@@ -113,6 +113,12 @@ export function createWater(seed = 777): Water {
       const depth = bot - top;
       if (depth <= 1) return;
 
+      // The ONE clock this layer reads. Freezing it here is what stops the
+      // ripples winking and the waterline shimmering with motion off — every
+      // sine below runs off `t`, never off `timeMs`, so there is no second
+      // place for time to leak back in.
+      const t = motion === 0 ? 0 : timeMs / 1000;
+
       // 1 — the body. Near water is deeper and darker.
       const body = g.createLinearGradient(0, top, 0, bot);
       body.addColorStop(0, v.mid);
@@ -155,9 +161,9 @@ export function createWater(seed = 777): Water {
           const halfW = 1.5 + d * (lamp.kind === 'moon' ? 26 : 9);
           const dash = 1 + Math.floor(d * 4);
           const gap = 2 + Math.floor(d * 6);
-          const scroll = motion === 0 ? 0 : (timeMs / 1000) * (8 + d * 22);
+          const scroll = t * (8 + d * 22);
           for (let x = cx - halfW; x < cx + halfW; x += dash + gap) {
-            const j = Math.sin(x * 0.7 + y * 0.9 + (timeMs / 1000) * 2.2);
+            const j = Math.sin(x * 0.7 + y * 0.9 + t * 2.2);
             if (j < -0.25) continue;
             const edge = 1 - Math.abs(x - cx) / halfW;
             const a = edge * (0.16 + 0.2 * j) * (1 - d * 0.35);
@@ -176,13 +182,13 @@ export function createWater(seed = 777): Water {
 
       // 4 — ripple highlights, drifting with the current.
       const count = Math.round(field.length * RIPPLE_SCALE[Math.min(notch, 2)]!);
-      const drift = motion === 0 ? 0 : (timeMs / 1000) * 6;
+      const drift = t * 6;
       g.fillStyle = v.lift;
       for (let i = 0; i < count; i++) {
         const rp = field[i]!;
         const y = top + 3 + rp.fy * (depth - 3);
         const d = (y - top) / depth;
-        const a = Math.max(0, Math.sin((timeMs / 1000) * rp.speed + rp.phase)) * (0.34 - d * 0.16);
+        const a = Math.max(0, Math.sin(t * rp.speed + rp.phase)) * (0.34 - d * 0.16);
         if (a < 0.04) continue;
         const x = ((rp.fx * w + drift) % w + w) % w;
         g.globalAlpha = a;
@@ -221,7 +227,7 @@ export function createWater(seed = 777): Water {
       g.globalAlpha = 0.5;
       g.fillStyle = v.lift;
       for (let x = 0; x < w; x++) {
-        const n = Math.abs(Math.sin(x * 0.35 + timeMs / 3000));
+        const n = Math.abs(Math.sin(x * 0.35 + t / 3));
         if (n > 0.56) g.fillRect(x, top + (n > 0.72 ? 1 : 0), 1 + Math.round(n), 1);
       }
       g.restore();

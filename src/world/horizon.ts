@@ -75,7 +75,10 @@ export function horizon(h: number, deckTopPx: number): Horizon {
     cityTop: Math.round(above * 0.40),
     skyBot: Math.round(above * 0.55),
     cityBot: waterTop,
-    bridgeTop: Math.round(above * 0.75),
+    // Close to the waterline on purpose. A distant bridge is a THIN band; give
+    // it a quarter of the sky and it stops being a bridge across a river and
+    // becomes a viaduct you are standing under.
+    bridgeTop: Math.round(above * 0.86),
     bridgeBot: waterTop + Math.round(h * 0.03),
     waterTop,
     waterBot,

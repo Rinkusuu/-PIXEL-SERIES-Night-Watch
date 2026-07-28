@@ -61,6 +61,10 @@ export function drawStatic(
     fill: rgbToHex(mixRgb(skyMid, deepRgb, 0.82)),
     ink,
     density: 0.52,
+    // Pulled well down toward the stone. At full horizon brightness the voids
+    // stop reading as openings and start reading as lamps.
+    hazeTop: rgbToHex(mixRgb(hexToRgb(v.sky[2]), hexToRgb(v.mid), 0.58)),
+    hazeBot: v.deep,
   });
 
   // 4 — the stone you are standing on. Wet on a rainy night: darker, so the
