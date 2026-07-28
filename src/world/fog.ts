@@ -22,6 +22,52 @@ export function fogOffset(timeMs: number, band: number, motion: number): number 
   return timeMs * b.speed * motion;
 }
 
+/** How many soft lobes make up the pool at the city's feet. */
+const POOL_LOBES = 22;
+
+/**
+ * The pool. Buildings must come OUT of the fog, not stand on top of it — as
+ * long as their feet are cut off at a ruled line, the best silhouette in the
+ * world still reads as a sticker pasted on the sky.
+ *
+ * Drawn as overlapping lobes with an uneven top edge rather than as a gradient
+ * band, for the same reason the drifting bands are puffs: a strip that is
+ * uniform along x has no shape for the eye to catch.
+ */
+function drawPool(
+  g: CanvasRenderingContext2D,
+  w: number,
+  hz: Horizon,
+  v: AmbientValues,
+  thickness: number,
+): void {
+  const baseY = hz.cityBot;
+  const lobeW = w / POOL_LOBES;
+
+  g.save();
+  for (let i = 0; i < POOL_LOBES; i++) {
+    const x = (i + 0.5) * lobeW;
+    // Two detuned sines give the top edge a ragged line without any randomness,
+    // so the pool is identical between plate rebuilds.
+    const lift = 0.55 + Math.sin(i * 1.7) * 0.22 + Math.sin(i * 0.6) * 0.16;
+    const ry = (hz.cityBot - hz.bridgeTop) * lift;
+
+    g.globalAlpha = Math.min(0.7, 0.30 * thickness);
+    const grad = g.createRadialGradient(x, baseY, 0, x, baseY, lobeW * 1.35);
+    grad.addColorStop(0, v.accent);
+    grad.addColorStop(1, 'transparent');
+    g.fillStyle = grad;
+    g.save();
+    g.translate(x, baseY);
+    g.scale(1, ry / (lobeW * 1.35));
+    g.beginPath();
+    g.arc(0, 0, lobeW * 1.35, 0, Math.PI * 2);
+    g.fill();
+    g.restore();
+  }
+  g.restore();
+}
+
 /**
  * Each band is a row of soft puffs, NOT a flat gradient strip. A strip that is
  * uniform along x looks identical after a horizontal translation, so drifting
@@ -39,6 +85,10 @@ export function drawFog(
   // Thicker fog as the world darkens, and thicker again on a foggy night.
   const thickness = (1 - v.lum) * fogScale;
   if (thickness <= 0.01) return;
+
+  // The pool goes first: the drifting bands belong to the river and must ride
+  // over it, not under it.
+  drawPool(g, w, hz, v, thickness);
 
   const top = hz.waterTop;
   const span = hz.h - hz.waterTop;

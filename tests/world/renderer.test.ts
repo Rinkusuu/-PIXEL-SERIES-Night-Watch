@@ -95,3 +95,34 @@ describe('drawFog', () => {
     expect(hz.railTop).toBeLessThan(hz.deckTop);
   });
 });
+
+describe("fog pools at the city's feet", () => {
+  const v = resolve(NIGHT_KEYS, 0.62, gradesFor(['calm']));
+  const hz = horizon(900, 594);
+
+  it('does more work than the three drifting bands alone', () => {
+    // A pool at cityBot is what makes buildings emerge FROM fog rather than
+    // stand ON a ruled line. Without it the best silhouette in the world still
+    // reads as a sticker.
+    //
+    // 174 is exactly what the three bands cost on their own, measured before
+    // the pool existed. A looser bound here would be a test that cannot fail.
+    const { g, calls } = countingCtx();
+    drawFog(g, 800, hz, v, 0, 1, 1);
+    expect(calls()).toBeGreaterThan(174);
+  });
+
+  it('still draws nothing when the night has no fog to give', () => {
+    const { g, calls } = countingCtx();
+    drawFog(g, 800, hz, v, 0, 1, 0);
+    expect(calls()).toBe(0);
+  });
+
+  it('scales the pool with the weather like everything else', () => {
+    const thin = countingCtx();
+    const thick = countingCtx();
+    drawFog(thin.g, 800, hz, v, 0, 1, 0.55);
+    drawFog(thick.g, 800, hz, v, 0, 1, 2);
+    expect(thick.calls()).toBeGreaterThanOrEqual(thin.calls());
+  });
+});
