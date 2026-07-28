@@ -4,25 +4,27 @@ import type { Block } from './city';
 import type { Horizon } from './horizon';
 import type { Weather } from './weather';
 import { HATCH_ANGLES } from './hatch';
-import { drawSkyline } from './city';
+import { drawSkyline, skyline } from './city';
 import { drawBridge } from './bridge';
 import { drawDeck } from './deck';
+import { drawForeground } from './foreground';
+import { valueLadder } from './ladder';
 
 /**
- * Engraving ink. `--amb-deep` alone is too close to the sky at night and the
- * whole plate washes out; the ink is pushed most of the way to black so the
- * hatching still reads at lum 0.08.
+ * Engraving ink. Pushed most of the way to black so the hatching still reads
+ * against the fog, which is now the brightest thing in the picture rather than
+ * a dark veil over it.
  */
 export function inkFor(v: AmbientValues): string {
-  return rgbToHex(mixRgb(hexToRgb(v.deep), [2, 3, 6], 0.62));
+  return rgbToHex(mixRgb(hexToRgb(v.sky[2]), [4, 6, 8], 0.82));
 }
 
 /**
  * The static plate: everything that only changes when the palette, the size, or
- * the weather does. The river, the lamps, the smoke and the fog are drawn live
- * on top of this by the renderer.
+ * the weather does.
  *
- * Not one composition number is computed here — they all come from `hz`.
+ * Not one composition number is computed here — they all come from `hz`. Not one
+ * depth value either — they all come from `valueLadder`.
  */
 export function drawStatic(
   g: CanvasRenderingContext2D,
@@ -43,22 +45,36 @@ export function drawStatic(
   g.fillRect(0, 0, w, hz.waterTop);
 
   const ink = inkFor(v);
-  const deepRgb = hexToRgb(v.deep);
-  const skyMid = hexToRgb(v.sky[1]);
+  const wet = weather === 'rain' ? 0.18 : 0;
+  const ladder = valueLadder(v, wet);
 
-  // 2 — far city.
+  // 2 — the band BEHIND the skyline. Its own seed, so its towers land between
+  //     the near ones rather than behind them, and a much paler fill: the whole
+  //     signal of "further away" is that it is closer to the fog's own value.
+  //     Generated here rather than in the renderer because nothing outside the
+  //     plate ever needs it — only the near band feeds smoke its chimneys.
+  const far = skyline(w, hz.cityTop, hz.cityBot, Math.round(w * 17 + hz.h));
+  drawSkyline(g, far, hz.cityBot, {
+    angle: HATCH_ANGLES.far,
+    fill: ladder.cityFar,
+    ink,
+    density: 0.18,
+    maxGap: 17,
+  });
+
+  // 3 — far city, veiled by distance.
   drawSkyline(g, blocks, hz.cityBot, {
     angle: HATCH_ANGLES.far,
-    fill: rgbToHex(mixRgb(skyMid, deepRgb, 0.55)),
+    fill: ladder.city,
     ink,
     density: 0.34,
     maxGap: 13,
   });
 
-  // 3 — upstream bridge, standing in front of the city's feet. That overlap is
+  // 4 — upstream bridge, standing in front of the city's feet. That overlap is
   //     what gives the picture its depth.
   drawBridge(g, w, hz, {
-    fill: rgbToHex(mixRgb(skyMid, deepRgb, 0.82)),
+    fill: ladder.bridge,
     ink,
     density: 0.52,
     // Pulled well down toward the stone. At full horizon brightness the voids
@@ -67,12 +83,11 @@ export function drawStatic(
     hazeBot: v.deep,
   });
 
-  // 4 — the stone you are standing on. Wet on a rainy night: darker, so the
-  //     live reflections read stronger against it.
-  const wet = weather === 'rain' ? 0.18 : 0;
-  drawDeck(g, w, hz, {
-    fill: rgbToHex(mixRgb(deepRgb, [2, 3, 6], 0.35 + wet + progress * 0.05)),
-    ink,
-    rail: rgbToHex(mixRgb(deepRgb, [2, 3, 6], 0.18 + wet)),
-  });
+  // 5 — the stone you are standing on.
+  drawDeck(g, w, hz, { fill: ladder.deck, ink, rail: ladder.rail });
+
+  // 6 — the near vignette. Last, nearest, and dead black at every state.
+  drawForeground(g, w, hz, ladder.vignette);
+
+  void progress;
 }

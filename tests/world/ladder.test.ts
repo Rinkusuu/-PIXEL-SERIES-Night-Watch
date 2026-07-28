@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { VIGNETTE_INK, valueLadder } from '../../src/world/ladder';
 import { NIGHT_KEYS } from '../../src/ambient/keyframes';
 import { gradesFor } from '../../src/ambient/grade';
@@ -55,5 +56,20 @@ describe('valueLadder', () => {
     const lum = (hex: string) => luminance(hexToRgb(hex));
     expect(lum(valueLadder(v, 0.18).deck)).toBeLessThan(lum(valueLadder(v, 0).deck));
     expect(lum(valueLadder(v, 0.18).deck)).toBeGreaterThan(lum(valueLadder(v, 0.18).rail));
+  });
+});
+
+describe('layers.ts stops mixing its own values', () => {
+  const src = readFileSync('src/world/layers.ts', 'utf8');
+
+  it('asks the ladder instead of reaching for deep and sky[1]', () => {
+    expect(src).toContain('valueLadder');
+  });
+
+  it('leaves no hand-rolled depth mix behind', () => {
+    // Two modules mixing their own way from their own anchors is what made the
+    // depth order an accident rather than a guarantee.
+    expect(src).not.toContain('mixRgb(skyMid');
+    expect(src).not.toContain('[2, 3, 6]');
   });
 });
