@@ -30,7 +30,7 @@ export function TheWatch({
       title="The Watch"
       index={0}
       float
-      className="span-2 row-2"
+      className="span-2"
       tools={
         <button
           type="button"

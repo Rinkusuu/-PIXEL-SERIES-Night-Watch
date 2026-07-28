@@ -40,7 +40,7 @@ export function TheQuarry({
       {quarry.length === 0
         ? <p className="label">{COPY.quarryEmpty}</p>
         : (
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          <ul className="list--scroll" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
             {quarry.map((q) => (
               <li key={q.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--px2)', padding: 'var(--px) 0' }}>
                 <Button

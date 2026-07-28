@@ -20,12 +20,14 @@ body {
   display: block;
 }
 
-/* Chrome layer */
+/* Chrome layer. Docked to the bottom so the glass rests on the balustrade
+   instead of covering the river it is supposed to be standing over. */
 .app {
   position: relative;
   z-index: 1;
   display: flex;
   flex-direction: column;
+  justify-content: flex-end;
   gap: var(--px6);
   padding: var(--px5) clamp(var(--px3), 3vw, var(--px8)) var(--px5);
   max-width: 1680px;

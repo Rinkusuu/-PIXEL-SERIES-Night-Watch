@@ -10,6 +10,8 @@ import { streakLength } from '../session/streak';
 import { load, save } from '../store/persist';
 import type { Schema } from '../store/schema';
 import { motionValue, nextMotion } from './motion';
+import { nightKey } from '../session/streak';
+import { weatherFor, type Weather } from '../world/weather';
 
 const BLOODMOON_STREAK = 5;
 const PRESSED_MS = 5 * 60_000;
@@ -27,6 +29,11 @@ export function useNightWatch() {
 
   const streak = useMemo(() => streakLength(data.sessions, now), [data.sessions, now]);
   const ledger = useMemo(() => minutesByNight(data.sessions, now, 7), [data.sessions, now]);
+
+  // The night's weather, drawn once from the same key the streak counts by. It
+  // must not change on a re-render, or the sky would reshuffle mid-session.
+  const tonight = nightKey(now);
+  const weather = useMemo<Weather>(() => weatherFor(tonight), [tonight]);
 
   const progress = progressOf(session, now);
   const remainingMs = session.phase === 'idle'
@@ -144,7 +151,7 @@ export function useNightWatch() {
   }), [dispatch]);
 
   return {
-    session, values, progress, motion, grades, data, remainingMs, streak, ledger,
+    session, values, progress, motion, grades, data, remainingMs, streak, ledger, weather,
     recovered: boot.recovered, actions,
   };
 }
