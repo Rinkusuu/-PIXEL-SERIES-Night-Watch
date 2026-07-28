@@ -7,7 +7,6 @@ import { HATCH_ANGLES } from './hatch';
 import { drawSkyline, skyline } from './city';
 import { drawBridge } from './bridge';
 import { drawDeck } from './deck';
-import { drawForeground } from './foreground';
 import { valueLadder } from './ladder';
 
 /**
@@ -86,8 +85,10 @@ export function drawStatic(
   // 5 — the stone you are standing on.
   drawDeck(g, w, hz, { fill: ladder.deck, ink, rail: ladder.rail });
 
-  // 6 — the near vignette. Last, nearest, and dead black at every state.
-  drawForeground(g, w, hz, ladder.vignette);
+  // The near vignette is NOT drawn here. It belongs in front of the river, the
+  // fog and the lamps, all of which are painted live over this plate — put it on
+  // the plate and the water washes the gate piers straight back out. The
+  // renderer draws it last. See renderer.ts.
 
   void progress;
 }

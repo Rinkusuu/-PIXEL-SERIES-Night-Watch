@@ -46,6 +46,16 @@ Each night's weather (`clear` / `fog` / `rain` / `fullmoon`) is rolled
 deterministically from the same `nightKey()` the streak counts by, so a night
 never reshuffles on a resize.
 
+Depth values come from `src/world/ladder.ts`, never from a module's own mix. The
+frame-edge ink is a fixed constant that never touches the ambient palette — it
+is the picture's value anchor, and letting it follow ambient would collapse the
+contrast at exactly the moment the fog is thickest. `tests/world/ladder.test.ts`
+checks the rungs stay in order across every keyframe and grade combination.
+
+The near vignette (`src/world/foreground.ts`) is what makes the scene read as a
+place you are standing in rather than a backdrop. It is drawn **last**, in the
+live pass — on the cached plate the river would wash the gate piers back out.
+
 ## Testing policy
 
 Pure modules (`ambient/`, `session/`, `store/`, `world/hatch`) are unit-tested.

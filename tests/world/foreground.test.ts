@@ -51,3 +51,22 @@ describe('the vignette never touches the ambient palette', () => {
     }
   });
 });
+
+describe('the vignette is drawn last, not baked into the plate', () => {
+  const renderer = readFileSync('src/world/renderer.ts', 'utf8');
+  const layers = readFileSync('src/world/layers.ts', 'utf8');
+
+  it('lives in the live pass, where nothing can paint over it', () => {
+    // It went on the static plate first, and the river — drawn live on top of
+    // that plate — washed the gate piers straight back out.
+    expect(renderer).toContain('drawForeground');
+    expect(layers).not.toContain('drawForeground(');
+  });
+
+  it('is the very last thing the frame draws', () => {
+    const body = renderer.slice(renderer.indexOf('function frame'));
+    for (const earlier of ['water.draw', 'drawWeather', 'drawFog', 'drawLamps']) {
+      expect(body.indexOf(earlier), earlier).toBeLessThan(body.indexOf('drawForeground'));
+    }
+  });
+});

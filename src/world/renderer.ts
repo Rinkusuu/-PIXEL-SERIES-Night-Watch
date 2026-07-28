@@ -5,6 +5,8 @@ import { drawStatic } from './layers';
 import { drawFog } from './fog';
 import { drawLamps, lampSpots, moonPos } from './bloom';
 import { SQUASH, createWater } from './water';
+import { drawForeground } from './foreground';
+import { VIGNETTE_INK } from './ladder';
 import { drawWeather, effectsFor, type Weather } from './weather';
 import { createFrameClock } from './quality';
 
@@ -131,6 +133,12 @@ export function createWorldRenderer() {
     drawWeather(target, w, hz, v, weather, blocks, water, timeMs, motion, notch);
     drawFog(target, w, hz, v, timeMs, motion, fx.fogScale);
     drawLamps(target, v, lamps, fx, timeMs, motion);
+
+    // The near vignette goes LAST. It is the closest thing in the picture, so
+    // nothing may be painted over it — least of all the river, which would wash
+    // the gate piers straight back out. Cheap enough to redraw every frame, and
+    // it must be: the layers in front of the plate are all live.
+    drawForeground(target, w, hz, VIGNETTE_INK);
 
     if (started !== 0) clock.sample(performance.now() - started);
   }
