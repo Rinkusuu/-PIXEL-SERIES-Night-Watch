@@ -8,6 +8,7 @@ import { drawBridge } from './bridge';
 import { drawDeck } from './deck';
 import { valueLadder } from './ladder';
 import { drawWatcher } from './figure';
+import { drawBank } from './bank';
 import { drawSky } from './sky';
 import { moonPos } from './bloom';
 import { effectsFor, type Weather } from './weather';
@@ -83,6 +84,19 @@ export function drawStatic(
     openings: true,
     details: true,
   });
+
+  // 3b — the far bank. Drawn between the city and the bridge, so the bridge
+  //      covers it everywhere except through its own arches — which is the only
+  //      place it can be seen at all, and the reason each arch stops being a
+  //      hole with a gradient in it. See bank.ts.
+  drawBank(g, w, hz, {
+    // Between the city's rung and the bridge's. Give it the bridge's own value
+    // and it vanishes into the arch surround; give it the city's and it stops
+    // reading as a nearer edge than the buildings behind it.
+    wall: rgbToHex(mixRgb(hexToRgb(ladder.city), hexToRgb(ladder.bridge), 0.45)),
+    ink,
+    dark: ladder.deck,
+  }, Math.round(w * 7 + hz.h));
 
   // 4 — upstream bridge, standing in front of the city's feet. That overlap is
   //     what gives the picture its depth.

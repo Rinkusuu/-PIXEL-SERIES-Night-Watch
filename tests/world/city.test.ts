@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  FAR_SCALE, MIN_SPIRE_ASPECT, SPIRE_MAX_W, drawSkyline, skyline, skyline as gen,
+  FAR_SCALE, MIN_SPIRE_ASPECT, SPIRE_MAX_W, drawSkyline, openings, setbackOf,
+  skyline, skyline as gen,
   type ShapeKind,
 } from '../../src/world/city';
 import { countingCtx } from '../helpers/counting-ctx';
@@ -104,18 +105,123 @@ describe('every shape carries its own detail', () => {
     clockTower: 2,  // cornice band + hands
     factory: 3,     // two iron bands + capping ring
     crane: 2,       // jib + hook and tie
+    gap: 0,         // nothing stands here; the slot is sky
   };
 
   for (const kind of Object.keys(DETAIL_STROKES) as ShapeKind[]) {
     it(`strokes ${DETAIL_STROKES[kind]} details on a ${kind}`, () => {
       const c = countingCtx();
       drawSkyline(c.g, [{ kind, x: 40, w: 60, top: 100, stackX: 70 }], 460, style);
-      expect(c.strokes()).toBe(1 + DETAIL_STROKES[kind]);
+      // A gap draws nothing at all — not even the hatch pass.
+      const hatchPass = kind === 'gap' ? 0 : 1;
+      expect(c.strokes()).toBe(hatchPass + DETAIL_STROKES[kind]);
     });
   }
 
-  it('leaves no shape bare', () => {
-    for (const n of Object.values(DETAIL_STROKES)) expect(n).toBeGreaterThan(0);
+  it('leaves no shape that stands there bare', () => {
+    for (const [kind, n] of Object.entries(DETAIL_STROKES)) {
+      if (kind === 'gap') continue;
+      expect(n, kind).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('gaps let the sky through', () => {
+  const seeds = [17, 91, 404, 9182, 31];
+
+  it('leaves some slots empty', () => {
+    // A skyline that runs contiguous from edge to edge reads as one blocked-off
+    // mass. In the near band a gap shows the far band through it.
+    for (const seed of seeds) {
+      const blocks = skyline(1400, 100, 460, seed);
+      expect(blocks.some((b) => b.kind === 'gap'), `seed ${seed}`).toBe(true);
+    }
+  });
+
+  it('never puts two gaps side by side', () => {
+    // Two in a row is one wide hole, and the band turns into a picket fence.
+    for (const seed of seeds) {
+      const blocks = skyline(1400, 100, 460, seed);
+      for (let i = 1; i < blocks.length; i++) {
+        expect(
+          blocks[i]!.kind === 'gap' && blocks[i - 1]!.kind === 'gap',
+          `seed ${seed} at ${i}`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it('keeps gaps narrow — an alley, not a square', () => {
+    for (const seed of seeds) {
+      for (const b of skyline(1400, 100, 460, seed).filter((v) => v.kind === 'gap')) {
+        expect(b.w).toBeLessThanOrEqual(Math.round(18 * 1.4));
+      }
+    }
+  });
+
+  it('still covers the full width, gaps and all', () => {
+    for (const seed of seeds) {
+      let x = 0;
+      const blocks = skyline(1400, 100, 460, seed);
+      for (const b of blocks) { expect(b.x).toBe(x); x += b.w; }
+      expect(x).toBeGreaterThanOrEqual(1400);
+    }
+  });
+
+  it('still guarantees a clock tower and a chimney', () => {
+    // Smoke needs somewhere to come from, and a landmark is still a landmark.
+    for (const seed of seeds) {
+      const blocks = skyline(1400, 100, 460, seed);
+      expect(blocks.filter((b) => b.kind === 'clockTower')).toHaveLength(1);
+      expect(blocks.some((b) => b.kind === 'factory')).toBe(true);
+    }
+  });
+
+  it('gives a gap no windows to light', () => {
+    for (const b of skyline(1400, 100, 460, 17).filter((v) => v.kind === 'gap')) {
+      expect(openings(b, 460)).toEqual([]);
+    }
+  });
+});
+
+describe('setbacks', () => {
+  it('steps a wide box in, and leaves a narrow one alone', () => {
+    const wide = { kind: 'flat' as const, x: 0, w: 80, top: 100 };
+    const narrow = { kind: 'flat' as const, x: 0, w: 30, top: 100 };
+    expect(setbackOf(wide, 460)).not.toBeNull();
+    expect(setbackOf(narrow, 460)).toBeNull();
+  });
+
+  it('never steps anything but a box', () => {
+    for (const kind of ['spire', 'dome', 'gable', 'factory', 'crane', 'gap'] as const) {
+      // A needle spire that juts out halfway up is a construction fault, not
+      // variety.
+      expect(setbackOf({ kind, x: 0, w: 80, top: 100 }, 460), kind).toBeNull();
+    }
+  });
+
+  it('keeps the upper windows on the upper mass', () => {
+    // The massing and openings() read the SAME setback. Computed twice and the
+    // top storeys hang off the shoulder in mid-air.
+    const b = { kind: 'flat' as const, x: 200, w: 80, top: 100 };
+    const sb = setbackOf(b, 460)!;
+    for (const o of openings(b, 460)) {
+      if (o.y + o.h <= sb.shoulder) {
+        expect(o.x).toBeGreaterThanOrEqual(b.x + sb.inset);
+        expect(o.x + o.w).toBeLessThanOrEqual(b.x + b.w - sb.inset);
+      }
+    }
+  });
+
+  it('still puts every opening inside the block', () => {
+    for (const seed of [17, 91, 404]) {
+      for (const b of skyline(1400, 100, 460, seed)) {
+        for (const o of openings(b, 460)) {
+          expect(o.x).toBeGreaterThanOrEqual(b.x);
+          expect(o.x + o.w).toBeLessThanOrEqual(b.x + b.w);
+        }
+      }
+    }
   });
 });
 

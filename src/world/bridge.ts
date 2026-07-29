@@ -91,10 +91,14 @@ export function drawBridge(
   //     feet, so an unpainted void shows city through it and the arch vanishes
   //     into the same dark mass. What you actually see through an arch over a
   //     river at night is distance: pale at the crown, water at the springing.
+  //     It is a WASH now, not an opaque fill. The far bank is drawn behind these
+  //     arches and an opaque haze painted it straight back out; distance is
+  //     supposed to veil what is through an opening, not replace it.
   const haze = g.createLinearGradient(0, crownY, 0, hz.bridgeBot);
   haze.addColorStop(0, s.hazeTop);
   haze.addColorStop(1, s.hazeBot);
   g.save();
+  g.globalAlpha = 0.42;
   g.beginPath();
   for (const sp of spans) archPath(g, sp.x0, sp.x1, crownY, hz.bridgeBot);
   g.fillStyle = haze;

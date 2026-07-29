@@ -8,7 +8,15 @@ import { hatch } from './hatch';
  * walking cursor with varying widths.
  */
 export type ShapeKind =
-  | 'gable' | 'flat' | 'spire' | 'dome' | 'clockTower' | 'factory' | 'crane';
+  | 'gable' | 'flat' | 'spire' | 'dome' | 'clockTower' | 'factory' | 'crane'
+  /**
+   * Nothing at all — a slot the cursor walks past without building on. The
+   * skyline ran contiguous from edge to edge, so the sky was never visible
+   * between two towers and the band read as one blocked-off mass. In the near
+   * band a gap shows the far band through it: depth that was already being
+   * paid for and never collected.
+   */
+  | 'gap';
 
 export type Block = {
   kind: ShapeKind;
@@ -35,6 +43,32 @@ export const MIN_SPIRE_ASPECT = 3.4;
  * the slot it stands in.
  */
 export const SPIRE_MAX_W = 34;
+
+/** How often the cursor leaves a slot empty. */
+const GAP_CHANCE = 0.11;
+/** Widest a gap may be, as a multiple of MIN_W. A gap as wide as a building is
+ *  a square, not an alley. */
+const GAP_MAX_W = 1.4;
+
+/** A block narrower than this has no room to step its upper mass in. */
+const SETBACK_MIN_W = 46;
+
+/**
+ * Where a tall box steps its upper mass in, and by how much. Read by BOTH the
+ * massing and `openings()` — computed twice and the windows spill off the
+ * shoulder. Same rule as `horizon()` and `lanternAnchor()`, and this project
+ * has already paid for breaking it twice.
+ *
+ * Returns null when the block is too small or the wrong kind to step.
+ */
+export function setbackOf(
+  b: Block, bot: number,
+): { shoulder: number; inset: number } | null {
+  if (b.kind !== 'flat' || b.w < SETBACK_MIN_W) return null;
+  const bh = bot - b.top;
+  if (bh < 60) return null;
+  return { shoulder: Math.round(b.top + bh * 0.38), inset: Math.round(b.w * 0.18) };
+}
 
 /**
  * `heightF`: 0 is a low shed, 1 is the tallest thing on the block.
@@ -88,14 +122,23 @@ export function skyline(
 
     // Annotated: without it TS infers `kind` through `lastKind`, which is
     // assigned from `kind` further down — a circular initializer (TS7022).
-    const kind: ShapeKind = run > 0 && lastKind !== null && roll < 0.62
-      ? lastKind
-      : pickKind(roll, heightF);
+    // A gap never follows a gap: two in a row is one wide hole and the band
+    // turns into a picket fence.
+    // Annotated for the same reason `kind` is: without it TS infers this
+    // through `lastKind`, which is assigned from `kind`, which reads this.
+    const wantGap: boolean = lastKind !== 'gap' && r() < GAP_CHANCE;
+    const kind: ShapeKind = wantGap
+      ? 'gap'
+      : run > 0 && lastKind !== null && roll < 0.62
+        ? lastKind
+        : pickKind(roll, heightF);
 
     // Towers are needles. Capping the width here rather than inside the massing
     // keeps the cursor's coverage of `w` exact.
     const narrow = kind === 'spire' || kind === 'clockTower';
-    const width = narrow ? Math.min(bw, SPIRE_MAX_W) : bw;
+    const width = kind === 'gap'
+      ? Math.min(bw, Math.round(minW * GAP_MAX_W))
+      : narrow ? Math.min(bw, SPIRE_MAX_W) : bw;
 
     // Guarantee the aspect ratio instead of hoping a random height clears it.
     // `floor`, not `round`: rounding down the top means rounding UP the height,
@@ -185,8 +228,14 @@ export function openings(b: Block, bot: number): Opening[] {
   const bh = bot - top;
 
   switch (kind) {
-    case 'flat':
-      return grid(x, top, x + w, bot);
+    case 'flat': {
+      // Follows the setback from the SAME source the massing uses. Two copies
+      // of this geometry and the upper storeys hang off the shoulder in mid-air.
+      const sb = setbackOf(b, bot);
+      if (!sb) return grid(x, top, x + w, bot);
+      return grid(x + sb.inset, top, x + w - sb.inset, sb.shoulder)
+        .concat(grid(x, sb.shoulder, x + w, bot));
+    }
 
     case 'gable':
       // Starts at the eaves the massing draws its roof from.
@@ -255,6 +304,7 @@ export function openings(b: Block, bot: number): Opening[] {
     }
 
     case 'crane':
+    case 'gap':
     default:
       return [];
   }
@@ -271,6 +321,10 @@ function massing(g: CanvasRenderingContext2D, b: Block, bot: number): void {
   const bh = bot - top;
   g.beginPath();
   switch (kind) {
+    case 'gap':
+      // Nothing. The slot exists so the cursor's arithmetic still covers the
+      // width; what stands in it is sky.
+      break;
     case 'gable':
       g.moveTo(x, bot); g.lineTo(x, top + bh * 0.34);
       g.lineTo(x + w / 2, top); g.lineTo(x + w, top + bh * 0.34);
@@ -323,20 +377,36 @@ function massing(g: CanvasRenderingContext2D, b: Block, bot: number): void {
       g.rect(x, top + bh * 0.55, w, bh * 0.45);
       break;
     case 'flat':
-    default:
+    default: {
       // A parapet, not a bare rectangle. One step in from each end is enough to
       // say the roof has an edge instead of a cut line — and boxes are now the
       // backbone of the skyline, so a bare one would be everywhere.
+      //
+      // Wide ones step their upper mass in as well. A box that runs the same
+      // width from roof to footing is a slab; one shoulder is the difference
+      // between a warehouse and a wall.
+      const sb = setbackOf(b, bot);
+      const ux = sb ? x + sb.inset : x;
+      const uw = sb ? w - sb.inset * 2 : w;
       g.moveTo(x, bot);
-      g.lineTo(x, top + 5);
-      g.lineTo(x + w * 0.14, top + 5);
-      g.lineTo(x + w * 0.14, top);
-      g.lineTo(x + w * 0.86, top);
-      g.lineTo(x + w * 0.86, top + 5);
-      g.lineTo(x + w, top + 5);
+      if (sb) {
+        g.lineTo(x, sb.shoulder);
+        g.lineTo(ux, sb.shoulder);
+      }
+      g.lineTo(ux, top + 5);
+      g.lineTo(ux + uw * 0.14, top + 5);
+      g.lineTo(ux + uw * 0.14, top);
+      g.lineTo(ux + uw * 0.86, top);
+      g.lineTo(ux + uw * 0.86, top + 5);
+      g.lineTo(ux + uw, top + 5);
+      if (sb) {
+        g.lineTo(ux + uw, sb.shoulder);
+        g.lineTo(x + w, sb.shoulder);
+      }
       g.lineTo(x + w, bot);
       g.closePath();
       break;
+    }
   }
 }
 
@@ -361,6 +431,7 @@ export function drawSkyline(
   s: SkylineStyle,
 ): void {
   for (const b of blocks) {
+    if (b.kind === 'gap') continue;
     g.fillStyle = s.fill;
     massing(g, b, bot);
     g.fill();
@@ -407,6 +478,7 @@ export function drawSkyline(
   g.strokeStyle = s.ink;
   g.lineWidth = 1;
   for (const b of blocks) {
+    if (b.kind === 'gap') continue;
     const bh = bot - b.top;
     const cx = b.x + b.w / 2;
     switch (b.kind) {
