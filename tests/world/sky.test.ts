@@ -134,8 +134,8 @@ describe('drawSky', () => {
   it('draws stars on a clear night and none in the fog', () => {
     const clear = countingCtx();
     const foggy = countingCtx();
-    drawSky(clear.g, 1440, hz, v, blocks, moon, effectsFor('clear').fogScale, 31);
-    drawSky(foggy.g, 1440, hz, v, blocks, moon, effectsFor('fog').fogScale, 31);
+    drawSky(clear.g, 1440, hz, v, blocks, moon, effectsFor('clear').fogScale, '#0a0e10', 31);
+    drawSky(foggy.g, 1440, hz, v, blocks, moon, effectsFor('fog').fogScale, '#0a0e10', 31);
     expect(clear.calls()).toBeGreaterThan(foggy.calls());
   });
 
@@ -147,14 +147,29 @@ describe('drawSky', () => {
     expect(src.indexOf('drawSky(')).toBeLessThan(src.indexOf('drawSkyline('));
   });
 
-  it('never strokes a cloud', () => {
+  it('never outlines a cloud, lobe by lobe or otherwise', () => {
     // `fill` merges overlapping subpaths; `stroke` does not. Stroking a bank
     // draws a loop of wire around every ellipse in it, including the ones
     // buried in the middle, and the sky fills with gold noodles. The lit edge
     // has to be PAINTED — canvas will not hand out a union outline.
+    //
+    // The strokes that remain are the hatch, one pass per bank. If that ever
+    // equals the lobe count instead, the outlines are back.
     const c = countingCtx();
-    drawSky(c.g, 1440, hz, v, blocks, moon, 1, 31);
-    expect(c.strokes()).toBe(0);
+    drawSky(c.g, 1440, hz, v, blocks, moon, 1, '#0a0e10', 31);
+    const banks = cloudBanks(1440, hz, 31 + 991);
+    const lobes = banks.reduce((s, b) => s + b.lobes.length, 0);
+    expect(c.strokes()).toBe(banks.length);
+    expect(c.strokes()).toBeLessThan(lobes);
+  });
+
+  it('hatches its clouds like everything else cut into the plate', () => {
+    // The sky itself stays bare — it is the paper. A cloud is an object drawn
+    // on that paper, and a flat vector fill in a plate made entirely of line
+    // work is the one thing in the picture that does not belong to it.
+    const c = countingCtx();
+    drawSky(c.g, 1440, hz, v, blocks, moon, 1, '#0a0e10', 31);
+    expect(c.strokes()).toBeGreaterThan(0);
   });
 
   it('washes each bank once from the side the moon is on', () => {
@@ -169,7 +184,7 @@ describe('drawSky', () => {
       },
       set: () => true,
     });
-    drawSky(g, 1440, hz, v, blocks, moon, 1, 31);
+    drawSky(g, 1440, hz, v, blocks, moon, 1, '#0a0e10', 31);
     expect(grads).toBe(cloudBanks(1440, hz, 31 + 991).length);
   });
 
@@ -187,7 +202,7 @@ describe('drawSky', () => {
       },
       set: () => true,
     });
-    drawSky(g, 1440, hz, v, blocks, moon, 1, 31);
+    drawSky(g, 1440, hz, v, blocks, moon, 1, '#0a0e10', 31);
     // One per bank, and none for the dome or the stars, which are fillRects.
     expect(fills).toBe(cloudBanks(1440, hz, 31 + 991).length);
   });

@@ -119,6 +119,29 @@ Korona bulan tetap di `drawLamps`, di lapis hidup, karena bulan memang di sana.
 
 ---
 
+## 7b. Dua perbaikan setelah dilihat mata
+
+**Awan harus diarsir.** Draf ini melewatkannya. Seluruh bahasa gambar ini ukiran; langit
+sendiri sengaja polos karena ia kertas kosongnya, tapi awan adalah objek yang **dipahat
+ke** kertas itu. Isian vektor rata di pelat yang seluruhnya garis adalah satu-satunya
+benda di gambar yang tidak ikut bahasanya. Kerapatan `0.13` — lebih ringan dari kota
+terjauh (`0.18`), karena awan lebih jauh dari apa pun yang berdiri di tanah. Sudut
+`far`, karena sudut menandai kedalaman (§C.2).
+
+**Siluetnya harus bergerigi.** Lobus dengan jari-jari yang seragam tersusun bersinggungan
+satu sama lain, dan gumpalannya keluar sebagai deretan lozenge mulus. Jari-jarinya
+sekarang condong ke kecil (`r()^1.7`) — banyak lobus kecil dengan sesekali yang besar —
+dan jitter vertikalnya tiga kali `ry`. Tanpa ini, arsiran sebanyak apa pun tidak akan
+membuatnya terbaca sebagai awan.
+
+**Pita jauh juga tidak boleh dapat detail stroke.** §7 sudah menyatakannya, tapi
+implementasinya cuma memasang gerbang untuk bukaan; loop detail di `drawSkyline` jalan
+tanpa syarat. Hasilnya crocket, dormer, pot cerobong dan jarum jam tergambar di skala
+0.55 dan tercecer di langit seperti serpihan. `SkylineStyle` sekarang punya `details`
+terpisah dari `openings`.
+
+---
+
 ## 8. Yang tidak dikerjakan
 
 - Awan bergerak. §2.

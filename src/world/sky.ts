@@ -3,6 +3,7 @@ import { hexToRgb, mixRgb, rgbToHex } from '../ambient/interpolate';
 import type { Block } from './city';
 import type { Horizon } from './horizon';
 import { stream } from './rng';
+import { HATCH_ANGLES, hatch } from './hatch';
 
 /**
  * The sky was the largest surface in the frame and the only one with nothing in
@@ -22,6 +23,13 @@ export type Cloud = { lobes: Lobe[] };
 const STAR_COUNT = 90;
 /** Cloud bands, from the top of the sky downward. */
 const BANDS = 3;
+
+/**
+ * Lighter than the far city's 0.18. Cloud is further off than anything standing
+ * on the ground, and the hatch is what keeps it in the same drawing as the rest
+ * of the plate rather than a flat shape pasted over it.
+ */
+const CLOUD_DENSITY = 0.13;
 
 /**
  * Stars crowd toward the top of the sky: the ones near the horizon are the
@@ -64,11 +72,15 @@ export function cloudBanks(w: number, hz: Horizon, seed: number): Cloud[] {
     let x = -w * (0.12 + r() * 0.10);
     let covered = -Infinity;
     for (let guard = 0; covered < w && guard < 200; guard++) {
-      const rx = Math.round(w * (0.022 + r() * 0.062));
-      const ry = Math.max(2, Math.round(rx * (0.16 + r() * 0.30) * thin));
+      // Skewed small: many little lobes with the occasional big one. An even
+      // spread of similar radii lays them out tangent to each other and the
+      // bank comes out as a run of smooth lozenges — the silhouette has to be
+      // ragged or no amount of hatching will make it read as cloud.
+      const rx = Math.max(4, Math.round(w * (0.010 + Math.pow(r(), 1.7) * 0.078)));
+      const ry = Math.max(2, Math.round(rx * (0.18 + r() * 0.34) * thin));
       lobes.push({
         x: Math.round(x),
-        y: Math.round(spineY + (r() - 0.5) * ry * 1.8),
+        y: Math.round(spineY + (r() - 0.5) * ry * 3.0),
         rx,
         ry,
       });
@@ -119,6 +131,8 @@ export function drawSky(
   blocks: readonly Block[],
   moon: { x: number; y: number },
   fogScale: number,
+  /** Engraving ink, passed in like `drawForeground`'s — never derived here. */
+  ink: string,
   seed: number,
 ): void {
   const sky0 = hexToRgb(v.sky[0]);
@@ -178,10 +192,28 @@ export function drawSky(
       }
     };
 
+    const bankTop = Math.min(...cloud.lobes.map((l) => l.y - l.ry));
+    const bankBot = Math.max(...cloud.lobes.map((l) => l.y + l.ry));
+
     trace();
     g.globalAlpha = 0.70;
     g.fillStyle = rgbToHex(mixRgb(local, sky0, 0.62));
     g.fill();
+
+    // Cloud is HATCHED, like everything else that is cut into the sky. The sky
+    // itself stays bare because it is the paper; a cloud is an object drawn on
+    // that paper, and a flat vector fill in a plate made entirely of line work
+    // is the one thing in the picture that does not belong to it.
+    //
+    // Lighter than the far city — cloud is further off than anything standing
+    // on the ground, and the same angle marks the same depth (§C.2).
+    g.save();
+    trace();
+    g.clip();
+    hatch(g, 0, bankTop, w, bankBot - bankTop, CLOUD_DENSITY, {
+      angle: HATCH_ANGLES.far, color: ink,
+    });
+    g.restore();
 
     // The side the moon is on, washed in with a gradient INSIDE the bank —
     // never stroked. `fill` merges overlapping subpaths; `stroke` does not, so
@@ -189,8 +221,6 @@ export function drawSky(
     // including the ones buried in the middle, and the sky fills with gold
     // noodles. Canvas will not hand out a union outline, so the lit edge has to
     // be painted rather than drawn.
-    const bankTop = Math.min(...cloud.lobes.map((l) => l.y - l.ry));
-    const bankBot = Math.max(...cloud.lobes.map((l) => l.y + l.ry));
     const below = moon.y > spineY;
     g.save();
     trace();

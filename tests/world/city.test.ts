@@ -84,7 +84,8 @@ describe('gothic verticality', () => {
 
 describe('every shape carries its own detail', () => {
   const style = {
-    angle: -0.42, fill: '#222', ink: '#000', density: 0.34, openings: false,
+    angle: -0.42, fill: '#222', ink: '#000', density: 0.34,
+    openings: false, details: true,
   };
 
   /**

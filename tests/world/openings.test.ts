@@ -73,7 +73,9 @@ describe('openings', () => {
 
 describe('openings are cut into the plate', () => {
   const blocks = skyline(1400, 100, 460, 17);
-  const style = { angle: -0.42, fill: '#222', ink: '#000', density: 0.34 };
+  const style = {
+    angle: -0.42, fill: '#222', ink: '#000', density: 0.34, details: false,
+  };
 
   it('does more drawing when the openings are switched on', () => {
     const off = countingCtx();

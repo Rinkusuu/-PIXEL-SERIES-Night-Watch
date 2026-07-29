@@ -347,6 +347,11 @@ export type SkylineStyle = {
   density: number;
   /** False for the far band: at twelve pixels wide an opening is a smudge. */
   openings: boolean;
+  /**
+   * False for the far band too. A crocket is four pixels long; at 0.55 scale a
+   * band of them reads as grit blown across the sky, not as gothic stonework.
+   */
+  details: boolean;
 };
 
 export function drawSkyline(
@@ -397,6 +402,8 @@ export function drawSkyline(
   // Until now the whole city carried two of these: pots on `flat` and a jib on
   // `crane`. Everything else was a bare shape, so the hatching was the only
   // texture in the band and it became the subject.
+  if (!s.details) return;
+
   g.strokeStyle = s.ink;
   g.lineWidth = 1;
   for (const b of blocks) {

@@ -55,7 +55,7 @@ export function drawStatic(
   //      and a rim on the wrong side is worse than no rim.
   drawSky(
     g, w, hz, v, blocks, moonPos(w, hz, progress),
-    effectsFor(weather).fogScale, Math.round(w * 13 + hz.h),
+    effectsFor(weather).fogScale, ink, Math.round(w * 13 + hz.h),
   );
 
   // 2 — the band BEHIND the skyline. Its own seed, so its towers land between
@@ -70,6 +70,7 @@ export function drawStatic(
     ink,
     density: 0.18,
     openings: false,
+    details: false,
   });
 
   // 3 — far city, veiled by distance.
@@ -79,6 +80,7 @@ export function drawStatic(
     ink,
     density: 0.34,
     openings: true,
+    details: true,
   });
 
   // 4 — upstream bridge, standing in front of the city's feet. That overlap is

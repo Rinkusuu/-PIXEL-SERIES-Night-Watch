@@ -10,7 +10,7 @@ import { horizon } from '../../src/world/horizon';
 import { skyline } from '../../src/world/city';
 
 /** Measured from the finished plate, then raised by about 15%. */
-const BUDGET = 17600;
+const BUDGET = 20300;
 
 /**
  * jsdom has no 2-D context, so `getContext('2d')` returns null on the offscreen
