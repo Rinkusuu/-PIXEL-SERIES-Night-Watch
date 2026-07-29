@@ -7,6 +7,7 @@ import type { WeatherFx } from './weather';
 import { piers } from './bridge';
 import { lanternAnchor } from './foreground';
 import { rand } from './rng';
+import { quayWindows } from './quay';
 
 const TOTAL_LAMPS = 14;
 
@@ -16,6 +17,13 @@ const TOTAL_LAMPS = 14;
  * ones mean anything — but three per cent is not a city, it is a power cut.
  */
 const WINDOW_LIT_PEAK = 0.12;
+
+/**
+ * The canal walls are lit at this share of the city's rate. They carry a
+ * thousand openings between them at arm's length; at the city's own rate their
+ * halos merge into one wall of light down each edge of the frame.
+ */
+const QUAY_LIT_SHARE = 0.28;
 
 /** How much of that peak still burns at the quietest hour. */
 const WINDOW_LIT_FLOOR = 0.35;
@@ -96,6 +104,21 @@ export function lampSpots(
     out.push({ x: c.x, y: c.y, r: c.r, lit: true, kind: 'window' });
   }
 
+  // The canal walls. Nearest windows in the picture, and the only ones close
+  // enough to the water to throw a real reflection down it. Same list
+  // `drawQuay` cuts dark, so a lit one always lands in an opening.
+  const quay = quayWindows(w, hz);
+  for (let i = 0; i < quay.length; i++) {
+    const wake = 0.15 + rand(i * 13 + 4201) * 1.70;
+    if (rand(i + 7717) >= frac * QUAY_LIT_SHARE * wake) continue;
+    const o = quay[i]!;
+    out.push({
+      x: Math.round(o.x + o.w / 2),
+      y: Math.round(o.y + o.h / 2),
+      r: 3, lit: true, kind: 'quay',
+    });
+  }
+
   // Gas standards on the bridge piers. These are the lights the river reflects
   // best, because they sit directly above it.
   const p = piers(w, hz);
@@ -160,10 +183,10 @@ function glowBlob(
 const MOON_DISC = '#f4f7f4';
 
 const HALO: Record<LampSpot['kind'], number> = {
-  window: 8, bridge: 12, street: 15, lantern: 20, moon: 3.6,
+  window: 8, quay: 7, bridge: 12, street: 15, lantern: 20, moon: 3.6,
 };
 const ALPHA: Record<LampSpot['kind'], number> = {
-  window: 0.34, bridge: 0.34, street: 0.30, lantern: 0.55, moon: 0.30,
+  window: 0.34, quay: 0.30, bridge: 0.34, street: 0.30, lantern: 0.55, moon: 0.30,
 };
 
 export function drawLamps(
