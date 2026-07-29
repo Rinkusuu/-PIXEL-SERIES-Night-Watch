@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { HATCH_ANGLES, gapFor, hatch } from '../../src/world/hatch';
+import {
+  HATCH_ANGLES, gapFor, hatch, reachFor, spreadFor,
+} from '../../src/world/hatch';
 
 /** Minimal recorder standing in for a 2D context. */
 function stubCtx() {
@@ -106,13 +108,61 @@ describe('HATCH_ANGLES', () => {
   });
 
   it('draws water dead flat', () => {
-    // Flat horizontal lines are the nineteenth-century engraver's convention for
-    // water. Any other angle and the river reads as a wall.
-    expect(HATCH_ANGLES.water).toBe(0);
+    // Angles here are measured FROM VERTICAL: hatch() lays its lines out
+    // vertically and then rotates them. 0 rad is a wall of verticals, which is
+    // exactly what the river must never be. A quarter turn is flat.
+    expect(HATCH_ANGLES.water).toBeCloseTo(Math.PI / 2, 10);
   });
 
   it('gives every depth a distinct angle', () => {
     const values = Object.values(HATCH_ANGLES);
     expect(new Set(values).size).toBe(values.length);
+  });
+});
+
+const USED_ANGLES = [
+  HATCH_ANGLES.far, HATCH_ANGLES.mid, HATCH_ANGLES.near, HATCH_ANGLES.water,
+  // Cross-hatch adds 1.13 rad to whatever angle it was given.
+  HATCH_ANGLES.far + 1.13, HATCH_ANGLES.mid + 1.13,
+  HATCH_ANGLES.near + 1.13, HATCH_ANGLES.water + 1.13,
+];
+
+const BOXES: readonly (readonly [number, number])[] = [
+  [1440, 250],  // the river: very wide, very shallow
+  [250, 1440],  // a tower slot: very tall
+  [300, 300],
+  [60, 400],
+];
+
+describe('hatch geometry', () => {
+  it('reaches every corner of the rect at every angle we draw', () => {
+    // `o` steps along the OFFSET axis and each segment runs along the LINE
+    // axis. Both have to clear the rect's corners or the hatching stops short.
+    for (const [w, h] of BOXES) {
+      for (const a of USED_ANGLES) {
+        const spread = spreadFor(w, h, a);
+        const reach = reachFor(w, h, a);
+        for (const sx of [-1, 1]) {
+          for (const sy of [-1, 1]) {
+            const cx = (sx * w) / 2;
+            const cy = (sy * h) / 2;
+            const along = cx * Math.cos(a) + cy * Math.sin(a);
+            const across = -cx * Math.sin(a) + cy * Math.cos(a);
+            expect(Math.abs(along), `spread ${w}x${h} @${a}`)
+              .toBeLessThanOrEqual(spread + 1e-9);
+            expect(Math.abs(across), `reach ${w}x${h} @${a}`)
+              .toBeLessThanOrEqual(reach + 1e-9);
+          }
+        }
+      }
+    }
+  });
+
+  it('would have fallen short across the river with the old single formula', () => {
+    // The old code computed one `diag` and used it for both jobs. That number is
+    // spreadFor's, and for flat water lines it measures the river's DEPTH where
+    // the segment needs the river's WIDTH.
+    const a = HATCH_ANGLES.water;
+    expect(spreadFor(1440, 250, a) * 2).toBeLessThan(reachFor(1440, 250, a));
   });
 });

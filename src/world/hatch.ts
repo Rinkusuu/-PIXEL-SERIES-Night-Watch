@@ -10,12 +10,16 @@ export const HATCH_ANGLES = {
   mid: -0.95,
   near: 0.30,
   /**
-   * Dead flat. Not a free choice: horizontal line work is how nineteenth-century
-   * engraving draws water, and it is what makes the river read as a horizontal
-   * surface instead of a vertical wall. The upstream bridge shares `mid` — its
-   * depth really is there, and a fifth angle would only blur the depth ladder.
+   * A quarter turn — flat. Angles here are measured FROM VERTICAL, because
+   * `hatch` lays its lines out vertically before rotating them. 0 rad is a wall
+   * of verticals, which is exactly what the river must never be.
+   *
+   * Flat horizontal line work is how nineteenth-century engraving draws water,
+   * and it is what makes the river read as a horizontal surface instead of a
+   * vertical wall. The upstream bridge shares `mid` — its depth really is
+   * there, and a fifth angle would only blur the depth ladder.
    */
-  water: 0.00,
+  water: Math.PI / 2,
 } as const;
 
 export type HatchOpts = {
@@ -32,6 +36,26 @@ const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 export function gapFor(value: number, minGap: number, maxGap: number): number {
   const t = Math.pow(clamp01(value), 0.72);
   return maxGap - (maxGap - minGap) * t;
+}
+
+/**
+ * Half-extent of the rect projected onto the OFFSET axis: how far `o` has to
+ * travel for the line family to cross the whole rect.
+ */
+export function spreadFor(w: number, h: number, angle: number): number {
+  return (Math.abs(w * Math.cos(angle)) + Math.abs(h * Math.sin(angle))) / 2;
+}
+
+/**
+ * Half-extent projected onto the LINE axis: how long each segment has to be.
+ *
+ * These two were one number until now, and that number was spreadFor's. Every
+ * angle we shipped happened to sit in a wide rect where the wrong value was
+ * still too big to notice; at a quarter turn it is far too small, and the
+ * hatching would appear as a narrow band down the middle of the river.
+ */
+export function reachFor(w: number, h: number, angle: number): number {
+  return (Math.abs(w * Math.sin(angle)) + Math.abs(h * Math.cos(angle))) / 2;
 }
 
 export function hatch(
@@ -64,13 +88,14 @@ export function hatch(
   g.lineWidth = lineWidth;
   g.globalAlpha = 0.55 + 0.45 * t;
 
-  const diag = Math.abs(w * Math.cos(angle)) + Math.abs(h * Math.sin(angle));
+  const spread = spreadFor(w, h, angle) + gap;
+  const reach = reachFor(w, h, angle) + 1;
   g.translate(x + w / 2, y + h / 2);
   g.rotate(angle);
   g.beginPath();
-  for (let o = -diag; o <= diag; o += gap) {
-    g.moveTo(o, -diag);
-    g.lineTo(o, diag);
+  for (let o = -spread; o <= spread; o += gap) {
+    g.moveTo(o, -reach);
+    g.lineTo(o, reach);
   }
   g.stroke();
   g.restore();
