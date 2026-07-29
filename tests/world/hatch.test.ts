@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  HATCH_ANGLES, gapFor, hatch, reachFor, spreadFor,
+  GAP_MAX, GAP_MIN, HATCH_ANGLES, gapFor, hatch, inkRatio, reachFor, spreadFor,
+  weightFor,
 } from '../../src/world/hatch';
 
 /** Minimal recorder standing in for a 2D context. */
@@ -8,6 +9,11 @@ function stubCtx() {
   const calls: string[] = [];
   const angles: number[] = [];
   let lines = 0;
+  // Captured from the FIRST pass only: the cross-hatch pass would otherwise
+  // overwrite the numbers we came to measure.
+  let width = 0;
+  let alpha = 0;
+  let stroked = false;
   const ctx = {
     save: () => calls.push('save'),
     restore: () => calls.push('restore'),
@@ -18,16 +24,20 @@ function stubCtx() {
     rotate: (a: number) => { calls.push('rotate'); angles.push(a); },
     moveTo: () => { lines++; },
     lineTo: () => {},
-    stroke: () => calls.push('stroke'),
+    stroke: () => { calls.push('stroke'); stroked = true; },
     strokeStyle: '',
-    lineWidth: 0,
-    globalAlpha: 0,
+    set lineWidth(v: number) { if (!stroked) width = v; },
+    get lineWidth() { return width; },
+    set globalAlpha(v: number) { if (!stroked) alpha = v; },
+    get globalAlpha() { return alpha; },
   };
   return {
     ctx: ctx as unknown as CanvasRenderingContext2D,
     get calls() { return calls; },
     get angles() { return angles; },
     get lines() { return lines; },
+    get width() { return width; },
+    get alpha() { return alpha; },
     strokes: () => calls.filter((c) => c === 'stroke').length,
   };
 }
@@ -164,5 +174,64 @@ describe('hatch geometry', () => {
     // the segment needs the river's WIDTH.
     const a = HATCH_ANGLES.water;
     expect(spreadFor(1440, 250, a) * 2).toBeLessThan(reachFor(1440, 250, a));
+  });
+});
+
+describe('the gap never widens into a motif', () => {
+  it('keeps every gap under the countable threshold', () => {
+    for (let v = 0; v <= 1.0001; v += 0.01) {
+      expect(gapFor(v)).toBeLessThanOrEqual(GAP_MAX + 1e-9);
+    }
+  });
+
+  it('pins the threshold itself', () => {
+    // Without this, the test above passes forever by raising GAP_MAX.
+    expect(GAP_MAX).toBeLessThanOrEqual(3.7);
+    expect(GAP_MIN).toBeGreaterThan(1);
+  });
+});
+
+describe('weightFor', () => {
+  it('rises monotonically with value', () => {
+    let prev = -Infinity;
+    for (let v = 0.02; v <= 1.0001; v += 0.02) {
+      const wv = weightFor(v);
+      expect(wv).toBeGreaterThanOrEqual(prev);
+      prev = wv;
+    }
+  });
+
+  it('never returns a width at or below zero', () => {
+    for (let v = 0; v <= 1.0001; v += 0.01) {
+      expect(weightFor(v)).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('inkRatio', () => {
+  it('orders the four depths the picture actually uses', () => {
+    // 0.18 far city, 0.34 near city and river, 0.52 bridge, 0.74 deck.
+    const used = [0.18, 0.34, 0.52, 0.74];
+    for (let i = 1; i < used.length; i++) {
+      expect(inkRatio(used[i]!)).toBeGreaterThan(inkRatio(used[i - 1]!));
+    }
+  });
+});
+
+describe('sub-pixel ink is paid for with alpha', () => {
+  it('never sets a stroke thinner than canvas can draw', () => {
+    const s = stubCtx();
+    hatch(s.ctx, 0, 0, 300, 300, 0.18);
+    expect(s.width).toBeGreaterThanOrEqual(0.5);
+  });
+
+  it('lands the same total ink either side of that floor', () => {
+    // lineWidth x alpha must come back to weightFor, whichever side of
+    // MIN_STROKE the wanted width falls on.
+    for (const v of [0.18, 0.34, 0.52, 0.74]) {
+      const s = stubCtx();
+      hatch(s.ctx, 0, 0, 300, 300, v);
+      expect(s.width * s.alpha, `value ${v}`).toBeCloseTo(weightFor(v), 6);
+    }
   });
 });

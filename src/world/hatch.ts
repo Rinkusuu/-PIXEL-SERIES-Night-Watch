@@ -27,15 +27,50 @@ export type HatchOpts = {
   color?: string;
   minGap?: number;
   maxGap?: number;
-  lineWidth?: number;
 };
+
+/**
+ * The gap is clamped narrow at EVERY depth. Above about four pixels a hatch
+ * stops reading as tone and starts reading as a motif — which is precisely how
+ * the far city, at twelve and a half pixels, turned into wallpaper.
+ */
+export const GAP_MIN = 1.6;
+export const GAP_MAX = 3.7;
+
+/**
+ * Ink width in pixels, as base plus slope over `value^0.72`. Expressed this way
+ * rather than as a min and a max because the line that matches the old ink
+ * coverage crosses zero at `value ≈ 0.011` — below `hatch`'s own cutoff, so no
+ * real layer ever reaches it, but a minimum would have to be a lie.
+ */
+export const WEIGHT_BASE = -0.035;
+export const WEIGHT_SLOPE = 0.72;
+
+/** Canvas will not draw a line thinner than about half a pixel reliably. */
+export const MIN_STROKE = 0.5;
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
-/** Density is read logarithmically; a linear ramp wastes half its range. */
-export function gapFor(value: number, minGap: number, maxGap: number): number {
-  const t = Math.pow(clamp01(value), 0.72);
-  return maxGap - (maxGap - minGap) * t;
+/** The eye reads line density logarithmically; a linear ramp wastes half its range. */
+const ramp = (value: number) => Math.pow(clamp01(value), 0.72);
+
+export function gapFor(value: number, minGap = GAP_MIN, maxGap = GAP_MAX): number {
+  return maxGap - (maxGap - minGap) * ramp(value);
+}
+
+/** The ink width we WANT. May be under MIN_STROKE; alpha covers the difference. */
+export function weightFor(value: number): number {
+  return Math.max(0.02, WEIGHT_BASE + WEIGHT_SLOPE * ramp(value));
+}
+
+/**
+ * Ink per unit area. The chords of a parallel line family crossing a region sum
+ * to `area / gap`, so coverage is width over gap and nothing else — angle does
+ * not enter it. This is the only number that may be used to judge how dark a
+ * layer is.
+ */
+export function inkRatio(value: number): number {
+  return weightFor(value) / gapFor(value);
 }
 
 /**
@@ -70,23 +105,26 @@ export function hatch(
   const {
     angle = HATCH_ANGLES.far,
     color = '#000000',
-    minGap = 2,
-    maxGap = 11,
-    lineWidth = 1,
+    minGap = GAP_MIN,
+    maxGap = GAP_MAX,
   } = opt;
 
   if (value <= 0.02) return;
 
-  const t = Math.pow(clamp01(value), 0.72);
   const gap = gapFor(value, minGap, maxGap);
+  // ONE knob carries the tone: the ink width we want. Where that falls under
+  // what canvas can stroke, alpha makes up the difference, so `lw * alpha`
+  // always comes back to `want`. Tone must not be counted twice.
+  const want = weightFor(value);
+  const lw = Math.max(MIN_STROKE, want);
 
   g.save();
   g.beginPath();
   g.rect(x, y, w, h);
   g.clip();
   g.strokeStyle = color;
-  g.lineWidth = lineWidth;
-  g.globalAlpha = 0.55 + 0.45 * t;
+  g.lineWidth = lw;
+  g.globalAlpha = want / lw;
 
   const spread = spreadFor(w, h, angle) + gap;
   const reach = reachFor(w, h, angle) + 1;
@@ -101,12 +139,13 @@ export function hatch(
   g.restore();
 
   // Crossing earlier than the darkest third makes the whole plate look dirty
-  // rather than dark.
+  // rather than dark. The second pass opens its gap by a third — a flat +1px
+  // was fine across a nine-pixel range and is far too much across two.
   if (value > 0.66) {
     hatch(g, x, y, w, h, (value - 0.66) / 0.34, {
       ...opt,
       angle: angle + 1.13,
-      minGap: minGap + 1,
+      minGap: minGap * 1.35,
     });
   }
 }
