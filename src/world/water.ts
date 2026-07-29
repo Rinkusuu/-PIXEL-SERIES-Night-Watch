@@ -25,7 +25,7 @@ export type LampSpot = {
   y: number;
   r: number;
   lit: boolean;
-  kind: 'window' | 'bridge' | 'street' | 'lantern' | 'moon';
+  kind: 'window' | 'quay' | 'bridge' | 'street' | 'lantern' | 'moon';
 };
 
 /**
@@ -154,7 +154,8 @@ export function createWater(seed = 777): Water {
       g.fillStyle = v.glow;
       for (const lamp of lamps) {
         if (!lamp.lit) continue;
-        if (lamp.kind !== 'bridge' && lamp.kind !== 'window' && lamp.kind !== 'moon') continue;
+        if (lamp.kind !== 'bridge' && lamp.kind !== 'window'
+            && lamp.kind !== 'quay' && lamp.kind !== 'moon') continue;
         const cx = lamp.x;
 
         // How far down the river this light's path runs, and how hard. A gas
