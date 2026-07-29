@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { openings, skyline } from '../../src/world/city';
+import { drawSkyline, openings, skyline } from '../../src/world/city';
+import { countingCtx } from '../helpers/counting-ctx';
 
 const BANDS: readonly (readonly [number, number, number])[] = [
   [1400, 100, 460],
@@ -67,5 +68,32 @@ describe('openings', () => {
       .flatMap((b) => openings(b, 460))
       .filter((o) => o.kind === 'window').length;
     expect(total).toBeGreaterThan(100);
+  });
+});
+
+describe('openings are cut into the plate', () => {
+  const blocks = skyline(1400, 100, 460, 17);
+  const style = { angle: -0.42, fill: '#222', ink: '#000', density: 0.34 };
+
+  it('does more drawing when the openings are switched on', () => {
+    const off = countingCtx();
+    const on = countingCtx();
+    drawSkyline(off.g, blocks, 460, { ...style, openings: false });
+    drawSkyline(on.g, blocks, 460, { ...style, openings: true });
+    expect(on.calls()).toBeGreaterThan(off.calls());
+  });
+
+  it('draws one call per opening, so none are silently dropped', () => {
+    const off = countingCtx();
+    const on = countingCtx();
+    drawSkyline(off.g, blocks, 460, { ...style, openings: false });
+    drawSkyline(on.g, blocks, 460, { ...style, openings: true });
+    const total = blocks.flatMap((b) => openings(b, 460));
+    const rects = total.filter((o) => o.kind !== 'clock').length;
+    const clocks = total.filter((o) => o.kind === 'clock').length;
+    // A rect is one fillRect; a clock face is beginPath + arc + fill. The
+    // fillStyle and globalAlpha assignments around them are property SETS, and
+    // countingCtx only counts gets.
+    expect(on.calls() - off.calls()).toBe(rects + clocks * 3);
   });
 });

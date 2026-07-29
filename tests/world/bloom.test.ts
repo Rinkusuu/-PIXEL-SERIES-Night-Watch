@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { horizon } from '../../src/world/horizon';
-import { skyline } from '../../src/world/city';
+import { openings, skyline } from '../../src/world/city';
 import { effectsFor } from '../../src/world/weather';
 import { lampSpots, moonPos } from '../../src/world/bloom';
 import { lanternAnchor } from '../../src/world/foreground';
@@ -70,6 +70,37 @@ describe('the lantern sits in its own housing', () => {
       const spots = lampSpots(1440, hz, blocks, p, effectsFor('fog'), moonPos(1440, hz, p));
       expect(spots.find((s) => s.kind === 'lantern')!.lit).toBe(true);
     }
+  });
+});
+
+describe('window lights come from real openings', () => {
+  const centre = (o: { x: number; y: number; w: number; h: number }) =>
+    `${Math.round(o.x + o.w / 2)},${Math.round(o.y + o.h / 2)}`;
+
+  const spots = lampSpots(1200, hz, blocks, 0.62, effectsFor('clear'),
+                          moonPos(1200, hz, 0.62));
+  const windows = spots.filter((s) => s.kind === 'window');
+
+  it('never invents a position of its own', () => {
+    // Two modules computing window positions separately is how the glow ends up
+    // beside the window instead of inside it.
+    const legal = new Set<string>();
+    for (const b of blocks) {
+      for (const o of openings(b, hz.cityBot)) {
+        if (o.kind === 'window') legal.add(centre(o));
+      }
+    }
+    expect(windows.length).toBeGreaterThan(0);
+    for (const s of windows) expect(legal.has(`${s.x},${s.y}`)).toBe(true);
+  });
+
+  it('never lights the same opening twice', () => {
+    expect(new Set(windows.map((s) => `${s.x},${s.y}`)).size).toBe(windows.length);
+  });
+
+  it('scatters them instead of marching in from one edge', () => {
+    const xs = windows.map((s) => s.x);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(1200 * 0.4);
   });
 });
 

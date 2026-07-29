@@ -334,6 +334,8 @@ export type SkylineStyle = {
   fill: string;
   ink: string;
   density: number;
+  /** False for the far band: at twelve pixels wide an opening is a smudge. */
+  openings: boolean;
 };
 
 export function drawSkyline(
@@ -355,6 +357,26 @@ export function drawSkyline(
     hatch(g, b.x, b.top, b.w, bot - b.top, s.density, {
       angle: s.angle, color: s.ink,
     });
+
+    // Openings, cut as dark holes while we are still clipped to the silhouette.
+    // Addendum §C.2 says a glowing thing is a HOLE in the hatching; until now
+    // there were no holes, so the window lights sat on top of solid wall.
+    // Unlit windows stay dark, and that is right: a city at night is mostly
+    // dark, and that is what makes the lit ones mean anything.
+    if (s.openings) {
+      g.fillStyle = s.ink;
+      g.globalAlpha = 0.85;
+      for (const o of openings(b, bot)) {
+        if (o.kind === 'clock') {
+          g.beginPath();
+          g.arc(o.x + o.w / 2, o.y + o.h / 2, o.w / 2, 0, Math.PI * 2);
+          g.fill();
+        } else {
+          g.fillRect(o.x, o.y, o.w, o.h);
+        }
+      }
+      g.globalAlpha = 1;
+    }
     g.restore();
   }
 

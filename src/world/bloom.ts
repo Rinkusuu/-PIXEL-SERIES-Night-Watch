@@ -1,5 +1,6 @@
 import type { AmbientValues } from '../ambient/types';
 import type { Block } from './city';
+import { openings } from './city';
 import type { Horizon } from './horizon';
 import type { LampSpot } from './water';
 import type { WeatherFx } from './weather';
@@ -27,6 +28,22 @@ export function moonPos(w: number, hz: Horizon, progress: number): { x: number; 
 }
 
 /**
+ * A stride co-prime with `n` walks every index exactly once. The size matters
+ * as much as the co-primality: candidates arrive grouped by building, and a
+ * building carries twenty-odd windows, so a small stride like 7 never leaves
+ * the wall it started on — every lit window lands on one house.
+ *
+ * The golden ratio is the classic low-discrepancy step: it spreads any prefix
+ * of the walk as evenly as a prefix can be spread.
+ */
+function scatterStride(n: number): number {
+  const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
+  let s = Math.max(1, Math.round(n * 0.6180339887));
+  while (s > 1 && gcd(s, n) !== 1) s--;
+  return s;
+}
+
+/**
  * ONE list of lights, consumed by both the bloom pass and the river's glitter
  * columns. Two lists computed separately is how you get a reflection that does
  * not line up with the lamp casting it.
@@ -42,23 +59,29 @@ export function lampSpots(
   const out: LampSpot[] = [];
   const n = lampCount(progress);
 
-  // Windows, spread by a co-prime stride so the ones that light first are
-  // scattered across the skyline instead of marching in from one edge.
-  const tall = blocks.filter((b) => b.kind !== 'crane');
-  const stride = 5;
-  for (let k = 0; k < tall.length; k++) {
-    const i = (k * stride) % tall.length;
-    const b = tall[i]!;
-    if (!b) continue;
-    out.push({
-      x: Math.round(b.x + b.w * (0.3 + ((i * 7) % 5) / 12)),
-      // Clamped into the building. A short warehouse is shorter than the window
-      // ladder, and an unclamped window would sit on the water in front of it.
-      y: Math.round(Math.max(b.top + 4, Math.min(b.top + 12 + ((i * 11) % 4) * 9, hz.cityBot - 6))),
-      r: 2 + (i % 2),
-      lit: k < n,
-      kind: 'window',
-    });
+  // Windows. Positions come from city.ts, never from a second guess here.
+  // Only the LIT ones become spots: an unlit window is already drawn dark on
+  // the plate, and pushing hundreds of dead entries through the glitter and
+  // bloom loops every frame buys nothing.
+  const candidates: { x: number; y: number; r: number }[] = [];
+  for (const b of blocks) {
+    if (b.kind === 'crane') continue;
+    for (const o of openings(b, hz.cityBot)) {
+      if (o.kind !== 'window') continue;
+      candidates.push({
+        x: Math.round(o.x + o.w / 2),
+        y: Math.round(o.y + o.h / 2),
+        r: Math.max(2, Math.round(Math.min(o.w, o.h) * 0.6)),
+      });
+    }
+  }
+  if (candidates.length > 0) {
+    const stride = scatterStride(candidates.length);
+    for (let k = 0; k < Math.min(n, candidates.length); k++) {
+      out.push({
+        ...candidates[(k * stride) % candidates.length]!, lit: true, kind: 'window',
+      });
+    }
   }
 
   // Gas standards on the bridge piers. These are the lights the river reflects

@@ -6,6 +6,7 @@ import { horizon } from '../../src/world/horizon';
 import { resolve } from '../../src/ambient/interpolate';
 import { NIGHT_KEYS } from '../../src/ambient/keyframes';
 import { gradesFor } from '../../src/ambient/grade';
+import { countingCtx } from '../helpers/counting-ctx';
 
 describe('channelDrift', () => {
   it('is zero for identical colours', () => {
@@ -55,22 +56,6 @@ describe('fogOffset', () => {
     expect(Math.sign(a)).not.toBe(Math.sign(b));
   });
 });
-
-/** Counts every drawing call, so we can assert on work done without a canvas. */
-function countingCtx(): { g: CanvasRenderingContext2D; calls: () => number } {
-  let calls = 0;
-  const grad = { addColorStop: () => {} };
-  const g = new Proxy({} as CanvasRenderingContext2D, {
-    get(_t, key) {
-      if (key === 'createRadialGradient' || key === 'createLinearGradient') {
-        return () => { calls++; return grad; };
-      }
-      return () => { calls++; };
-    },
-    set: () => true,
-  });
-  return { g, calls: () => calls };
-}
 
 describe('drawFog', () => {
   const v = resolve(NIGHT_KEYS, 0.4, gradesFor(['calm']));

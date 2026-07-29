@@ -58,6 +58,7 @@ export function drawStatic(
     fill: ladder.cityFar,
     ink,
     density: 0.18,
+    openings: false,
   });
 
   // 3 — far city, veiled by distance.
@@ -66,6 +67,7 @@ export function drawStatic(
     fill: ladder.city,
     ink,
     density: 0.34,
+    openings: true,
   });
 
   // 4 — upstream bridge, standing in front of the city's feet. That overlap is
