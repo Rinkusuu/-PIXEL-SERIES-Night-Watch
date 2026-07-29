@@ -126,6 +126,129 @@ export function skyline(w: number, top: number, bot: number, seed: number): Bloc
   return out;
 }
 
+export type OpeningKind = 'window' | 'clock' | 'louvre';
+export type Opening = {
+  kind: OpeningKind;
+  x: number; y: number; w: number; h: number;
+};
+
+const WIN_W = 4;
+const WIN_H = 7;
+/** Floor to floor. Under about ten and the rows merge into a smear. */
+const STOREY = 11;
+const COL_PITCH = 9;
+const INSET = 5;
+
+/**
+ * Fills a slab with a window grid, centred horizontally and clamped hard. A
+ * block too small for one whole row gets nothing at all — a clipped row reads
+ * as damage, not as a window.
+ */
+function grid(x0: number, y0: number, x1: number, y1: number): Opening[] {
+  const out: Opening[] = [];
+  const innerW = x1 - x0 - INSET * 2;
+  const cols = Math.floor((innerW + (COL_PITCH - WIN_W)) / COL_PITCH);
+  if (cols < 1) return out;
+  const gridW = cols * COL_PITCH - (COL_PITCH - WIN_W);
+  const sx = Math.round(x0 + (x1 - x0 - gridW) / 2);
+  for (let y = y0 + INSET; y + WIN_H <= y1 - INSET; y += STOREY) {
+    for (let c = 0; c < cols; c++) {
+      out.push({
+        kind: 'window', x: sx + c * COL_PITCH, y: Math.round(y), w: WIN_W, h: WIN_H,
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * Where a block's light can come from. Read by BOTH the plate, which cuts them
+ * as dark holes, and `bloom.ts`, which lights a handful — the same one-source
+ * rule as `horizon()` and `lanternAnchor()`. Two modules inventing window
+ * positions separately is how the glow ends up beside the window.
+ *
+ * Pure geometry, no randomness: nothing to keep in sync across callers.
+ */
+export function openings(b: Block, bot: number): Opening[] {
+  const { x, w, top, kind } = b;
+  const bh = bot - top;
+
+  switch (kind) {
+    case 'flat':
+      return grid(x, top, x + w, bot);
+
+    case 'gable':
+      // Starts at the eaves the massing draws its roof from.
+      return grid(x, top + bh * 0.34, x + w, bot);
+
+    case 'factory':
+      // The stack stays blind. Only the shed body is glazed.
+      return grid(x, top + bh * 0.62, x + w, bot);
+
+    case 'dome': {
+      // One arcade ring around the drum, and a grid on the block below it. A
+      // drum is not a terrace; a grid on it reads as an office in a hat.
+      const cx = x + w / 2;
+      const dr = Math.min(w * 0.34, 26);
+      const shoulder = top + dr * 2.1;
+      const out: Opening[] = [];
+      const n = Math.max(2, Math.floor((dr * 2) / 9));
+      const pitch = (dr * 2) / n;
+      const ringY = Math.round(top + dr + 3);
+      for (let i = 0; i < n; i++) {
+        const ox = Math.round(cx - dr + pitch * (i + 0.5) - 1.5);
+        if (ox < x || ox + 3 > x + w || ringY + 8 > bot) continue;
+        out.push({ kind: 'window', x: ox, y: ringY, w: 3, h: 8 });
+      }
+      return out.concat(grid(x, shoulder, x + w, bot));
+    }
+
+    case 'spire': {
+      // Two lancets on the shaft. The point stays clean — glazing a spire's
+      // point turns a church into a lighthouse.
+      const shaftTop = Math.round(top + bh * 0.55);
+      const out: Opening[] = [];
+      const ox = Math.round(x + w * 0.5 - 3);
+      if (ox < x || ox + 6 > x + w) return out;
+      for (const f of [0.28, 0.60]) {
+        const y = Math.round(shaftTop + (bot - shaftTop) * f);
+        if (y + 14 > bot - 4) continue;
+        out.push({ kind: 'window', x: ox, y, w: 6, h: 14 });
+      }
+      return out;
+    }
+
+    case 'clockTower': {
+      const sw = Math.min(w, 30);
+      const sx = x + (w - sw) / 2;
+      const face = Math.max(9, Math.round(sw * 0.5));
+      const faceY = Math.round(top + sw);
+      const out: Opening[] = [];
+      if (faceY + face <= bot - 4) {
+        out.push({
+          kind: 'clock',
+          x: Math.round(sx + (sw - face) / 2), y: faceY, w: face, h: face,
+        });
+      }
+      // Belfry louvres, under the clock stage.
+      const louvreY = faceY + face + 6;
+      if (louvreY + 8 <= bot - 4) {
+        for (let i = 0; i < 3; i++) {
+          out.push({
+            kind: 'louvre',
+            x: Math.round(sx + 4 + i * ((sw - 8) / 3)), y: louvreY, w: 3, h: 8,
+          });
+        }
+      }
+      return out;
+    }
+
+    case 'crane':
+    default:
+      return [];
+  }
+}
+
 /**
  * Massing only. Details (pots, jibs) are stroked separately after hatching.
  *
