@@ -6,6 +6,7 @@ import type { LampSpot } from './water';
 import type { WeatherFx } from './weather';
 import { piers } from './bridge';
 import { lanternAnchor } from './foreground';
+import { rand } from './rng';
 
 const TOTAL_LAMPS = 14;
 
@@ -38,22 +39,6 @@ export function moonPos(w: number, hz: Horizon, progress: number): { x: number; 
 }
 
 /**
- * A stride co-prime with `n` walks every index exactly once. The size matters
- * as much as the co-primality: candidates arrive grouped by building, and a
- * building carries twenty-odd windows, so a small stride like 7 never leaves
- * the wall it started on — every lit window lands on one house.
- *
- * The golden ratio is the classic low-discrepancy step: it spreads any prefix
- * of the walk as evenly as a prefix can be spread.
- */
-function scatterStride(n: number): number {
-  const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
-  let s = Math.max(1, Math.round(n * 0.6180339887));
-  while (s > 1 && gcd(s, n) !== 1) s--;
-  return s;
-}
-
-/**
  * ONE list of lights, consumed by both the bloom pass and the river's glitter
  * columns. Two lists computed separately is how you get a reflection that does
  * not line up with the lamp casting it.
@@ -73,8 +58,8 @@ export function lampSpots(
   // Only the LIT ones become spots: an unlit window is already drawn dark on
   // the plate, and pushing hundreds of dead entries through the glitter and
   // bloom loops every frame buys nothing.
-  const candidates: { x: number; y: number; r: number }[] = [];
-  for (const b of blocks) {
+  const candidates: { x: number; y: number; r: number; block: number }[] = [];
+  for (const [bi, b] of blocks.entries()) {
     if (b.kind === 'crane') continue;
     for (const o of openings(b, hz.cityBot)) {
       if (o.kind !== 'window') continue;
@@ -82,25 +67,33 @@ export function lampSpots(
         x: Math.round(o.x + o.w / 2),
         y: Math.round(o.y + o.h / 2),
         r: Math.max(2, Math.round(Math.min(o.w, o.h) * 0.6)),
+        block: bi,
       });
     }
   }
-  if (candidates.length > 0) {
-    // `n` counts LAMPS, and it was calibrated when a whole building carried one
-    // window. A city now offers hundreds, so a flat fourteen would leave it 97%
-    // dark. Windows scale with how many there are; the gas standards do not.
+
+  // `n` counts LAMPS, and it was calibrated when a whole building carried one
+  // window. A city now offers hundreds, so a flat fourteen would leave it 97%
+  // dark. Windows scale with how many there are; the gas standards do not.
+  //
+  // And they keep a floor. A lamplighter puts the gas out; nobody puts a
+  // household out, so the windows thin toward dawn rather than going dark.
+  const curve = WINDOW_LIT_FLOOR + (1 - WINDOW_LIT_FLOOR) * (n / TOTAL_LAMPS);
+  const frac = WINDOW_LIT_PEAK * curve;
+  for (let i = 0; i < candidates.length; i++) {
+    const c = candidates[i]!;
+    // Every opening holds a fixed lottery ticket, drawn from a pure function of
+    // its index — so it is stable frame to frame, and the lit set only ever
+    // GROWS as the night deepens. A window never blinks off because its
+    // neighbour lit.
     //
-    // And they keep a floor. A lamplighter puts the gas out; nobody puts a
-    // household out, so the windows thin toward dawn rather than going dark.
-    // At the floor alone the city still reads as inhabited.
-    const curve = WINDOW_LIT_FLOOR + (1 - WINDOW_LIT_FLOOR) * (n / TOTAL_LAMPS);
-    const want = Math.round(candidates.length * WINDOW_LIT_PEAK * curve);
-    const stride = scatterStride(candidates.length);
-    for (let k = 0; k < Math.min(want, candidates.length); k++) {
-      out.push({
-        ...candidates[(k * stride) % candidates.length]!, lit: true, kind: 'window',
-      });
-    }
+    // The threshold carries a per-BUILDING term because a household lights more
+    // than one window. Even per-window noise gives a uniform sprinkle, and a
+    // uniform sprinkle is not what a lit city looks like. `0.15 + u * 1.70`
+    // averages exactly 1, so clustering costs no overall brightness.
+    const wake = 0.15 + rand(c.block * 7 + 9001) * 1.70;
+    if (rand(i + 1) >= frac * wake) continue;
+    out.push({ x: c.x, y: c.y, r: c.r, lit: true, kind: 'window' });
   }
 
   // Gas standards on the bridge piers. These are the lights the river reflects

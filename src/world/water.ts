@@ -152,24 +152,43 @@ export function createWater(seed = 777): Water {
       //     gaslight on a river is the most London image there is; this is the
       //     part that must never be economised.
       g.globalCompositeOperation = 'lighter';
+      g.fillStyle = v.glow;
       for (const lamp of lamps) {
         if (!lamp.lit) continue;
         if (lamp.kind !== 'bridge' && lamp.kind !== 'window' && lamp.kind !== 'moon') continue;
         const cx = lamp.x;
-        for (let y = top + 1; y < bot; y += 2) {
+
+        // How far down the river this light's path runs, and how hard. A gas
+        // standard stands just above the water and throws a path all the way to
+        // your feet; a window two hundred pixels up in the city throws a short
+        // smear near the far bank. Giving every light the same full-depth column
+        // is what turned the river to gravel the moment the city started
+        // offering hundreds of lit windows instead of fourteen.
+        const above = Math.max(0, top - lamp.y);
+        const run = lamp.kind === 'moon'
+          ? depth
+          : depth * Math.max(0.10, 1 - above / (depth * 1.6));
+        const dim = lamp.kind === 'window' ? 0.5 : 1;
+        // Each light scatters on its own phase. Without it every column dashes
+        // in step and the water reads as a printed halftone.
+        const phase = ((cx * 0.37 + lamp.y * 0.11) % 1 + 1) % 1;
+        const end = Math.min(bot, top + run);
+
+        for (let y = top + 1; y < end; y += 2) {
           const d = (y - top) / depth;
+          // Dies out at its OWN end, not at the river's.
+          const fade = 1 - (y - top) / run;
           const halfW = 1.5 + d * (lamp.kind === 'moon' ? 26 : 9);
           const dash = 1 + Math.floor(d * 4);
           const gap = 2 + Math.floor(d * 6);
-          const scroll = t * (8 + d * 22);
+          const scroll = t * (8 + d * 22) + phase * (dash + gap);
           for (let x = cx - halfW; x < cx + halfW; x += dash + gap) {
-            const j = Math.sin(x * 0.7 + y * 0.9 + t * 2.2);
+            const j = Math.sin(x * 0.7 + y * 0.9 + t * 2.2 + phase * 6.28);
             if (j < -0.25) continue;
             const edge = 1 - Math.abs(x - cx) / halfW;
-            const a = edge * (0.16 + 0.2 * j) * (1 - d * 0.35);
+            const a = edge * (0.16 + 0.2 * j) * (1 - d * 0.35) * fade * dim;
             if (a < 0.03) continue;
             g.globalAlpha = Math.min(1, a);
-            g.fillStyle = v.glow;
             g.fillRect(
               Math.round(x + rowWobble(y, d, timeMs, motion) + ((scroll % (dash + gap)) - gap)),
               y, dash, 1,

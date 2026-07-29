@@ -102,6 +102,41 @@ describe('window lights come from real openings', () => {
     const xs = windows.map((s) => s.x);
     expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(1200 * 0.4);
   });
+
+  it('only ever adds windows as the night deepens, never blinks one off', () => {
+    // The lottery ticket is a pure function of the opening's index, so a rising
+    // threshold can only let more through. A window that went dark because its
+    // neighbour lit would read as a rendering fault, not as a city.
+    const at = (p: number) => new Set(
+      lampSpots(1200, hz, blocks, p, effectsFor('clear'), moonPos(1200, hz, p))
+        .filter((s) => s.kind === 'window')
+        .map((s) => `${s.x},${s.y}`),
+    );
+    const quiet = at(0);
+    const peak = at(0.62);
+    expect(peak.size).toBeGreaterThan(quiet.size);
+    for (const k of quiet) expect(peak.has(k)).toBe(true);
+  });
+
+  it('is identical frame to frame', () => {
+    // lampSpots runs every frame. Anything stateful in here would flicker.
+    const a = lampSpots(1200, hz, blocks, 0.4, effectsFor('clear'), moonPos(1200, hz, 0.4));
+    const b = lampSpots(1200, hz, blocks, 0.4, effectsFor('clear'), moonPos(1200, hz, 0.4));
+    expect(a).toEqual(b);
+  });
+
+  it('clusters the lit windows into households rather than sprinkling them', () => {
+    // A per-window roll alone gives a uniform sprinkle. Real streets have dark
+    // houses beside bright ones, so the threshold carries a per-building term.
+    // Measured as: the buildings that are lit at all carry more than one window
+    // each, on average.
+    const lit = lampSpots(1200, hz, blocks, 0.62, effectsFor('clear'), moonPos(1200, hz, 0.62))
+      .filter((s) => s.kind === 'window');
+    const homes = new Set(
+      lit.map((s) => blocks.findIndex((b) => s.x >= b.x && s.x <= b.x + b.w)),
+    );
+    expect(lit.length / homes.size).toBeGreaterThan(1.6);
+  });
 });
 
 describe('the moon carries the picture', () => {
