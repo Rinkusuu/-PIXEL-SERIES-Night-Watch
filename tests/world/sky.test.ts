@@ -147,29 +147,14 @@ describe('drawSky', () => {
     expect(src.indexOf('drawSky(')).toBeLessThan(src.indexOf('drawSkyline('));
   });
 
-  it('never outlines a cloud, lobe by lobe or otherwise', () => {
+  it('never strokes a cloud, and never outlines one', () => {
     // `fill` merges overlapping subpaths; `stroke` does not. Stroking a bank
     // draws a loop of wire around every ellipse in it, including the ones
-    // buried in the middle, and the sky fills with gold noodles. The lit edge
-    // has to be PAINTED — canvas will not hand out a union outline.
-    //
-    // The strokes that remain are the hatch, one pass per bank. If that ever
-    // equals the lobe count instead, the outlines are back.
+    // buried in the middle. Nothing in the world layer strokes at all now —
+    // a one-pixel line is what stopped this reading as pixel art.
     const c = countingCtx();
     drawSky(c.g, 1440, hz, v, blocks, moon, 1, '#0a0e10', 31);
-    const banks = cloudBanks(1440, hz, 31 + 991);
-    const lobes = banks.reduce((s, b) => s + b.lobes.length, 0);
-    expect(c.strokes()).toBe(banks.length);
-    expect(c.strokes()).toBeLessThan(lobes);
-  });
-
-  it('hatches its clouds like everything else cut into the plate', () => {
-    // The sky itself stays bare — it is the paper. A cloud is an object drawn
-    // on that paper, and a flat vector fill in a plate made entirely of line
-    // work is the one thing in the picture that does not belong to it.
-    const c = countingCtx();
-    drawSky(c.g, 1440, hz, v, blocks, moon, 1, '#0a0e10', 31);
-    expect(c.strokes()).toBeGreaterThan(0);
+    expect(c.strokes()).toBe(0);
   });
 
   it('washes each bank once from the side the moon is on', () => {

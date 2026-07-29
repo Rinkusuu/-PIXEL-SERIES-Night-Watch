@@ -1,5 +1,4 @@
 import { stream } from './rng';
-import { hatch } from './hatch';
 
 /**
  * The old skyline was twenty-six equal-width blocks with random heights. The eye
@@ -411,7 +410,6 @@ function massing(g: CanvasRenderingContext2D, b: Block, bot: number): void {
 }
 
 export type SkylineStyle = {
-  angle: number;
   fill: string;
   ink: string;
   density: number;
@@ -441,9 +439,6 @@ export function drawSkyline(
     g.save();
     massing(g, b, bot);
     g.clip();
-    hatch(g, b.x, b.top, b.w, bot - b.top, s.density, {
-      angle: s.angle, color: s.ink,
-    });
 
     // Openings, cut as dark holes while we are still clipped to the silhouette.
     // Addendum §C.2 says a glowing thing is a HOLE in the hatching; until now
@@ -467,124 +462,106 @@ export function drawSkyline(
     g.restore();
   }
 
-  // Details, stroked over the hatching and OUTSIDE the clip — a chimney pot, a
-  // finial and a dome lantern all live beyond the massing's own silhouette.
-  //
-  // Until now the whole city carried two of these: pots on `flat` and a jib on
-  // `crane`. Everything else was a bare shape, so the hatching was the only
-  // texture in the band and it became the subject.
+  // Details. Every one of them is a FILLED block, never a stroke. A one-pixel
+  // line is the thing that stopped this reading as pixel art — crockets and
+  // dome ribs came out as scratches scattered around the silhouettes, and the
+  // surface texture they sat on has gone with them.
   if (!s.details) return;
 
-  g.strokeStyle = s.ink;
-  g.lineWidth = 1;
+  g.fillStyle = s.ink;
   for (const b of blocks) {
     if (b.kind === 'gap') continue;
     const bh = bot - b.top;
-    const cx = b.x + b.w / 2;
+    const cx = Math.round(b.x + b.w / 2);
     switch (b.kind) {
       case 'flat': {
-        // A row of chimney pots. Terraces without them read as filing cabinets.
+        // Chimney pots. Terraces without them read as filing cabinets.
         g.fillStyle = s.fill;
         for (let k = 0; k < 3; k++) {
-          g.fillRect(b.x + b.w * (0.2 + k * 0.3), b.top - 7, 3, 7);
+          g.fillRect(Math.round(b.x + b.w * (0.2 + k * 0.3)), b.top - 7, 3, 7);
         }
-        g.beginPath();
-        g.moveTo(b.x, b.top + 9); g.lineTo(b.x + b.w, b.top + 9);
-        g.stroke();
+        // A water tank on the roof of the wider ones — the prop that says a
+        // flat roof is used rather than merely flat.
+        if (b.w > 40) {
+          g.fillRect(cx - 6, b.top - 9, 12, 9);
+          g.fillStyle = s.ink;
+          g.fillRect(cx - 6, b.top - 10, 12, 1);
+        }
+        g.fillStyle = s.ink;
+        g.fillRect(b.x, b.top + 8, b.w, 2);
         break;
       }
       case 'gable': {
-        const eave = b.top + bh * 0.34;
-        g.beginPath();
-        g.moveTo(b.x - 2, eave); g.lineTo(cx, b.top - 3); g.lineTo(b.x + b.w + 2, eave);
-        g.stroke();
+        const eave = Math.round(b.top + bh * 0.34);
         // One dormer, off centre: a symmetrical roof reads as a diagram.
-        const dx = b.x + b.w * 0.62;
-        g.beginPath();
-        g.moveTo(dx - 4, eave - 2); g.lineTo(dx - 4, eave - 9);
-        g.lineTo(dx, eave - 13); g.lineTo(dx + 4, eave - 9); g.lineTo(dx + 4, eave - 2);
-        g.stroke();
+        const dx = Math.round(b.x + b.w * 0.62);
+        g.fillStyle = s.fill;
+        g.fillRect(dx - 4, eave - 9, 8, 9);
+        g.fillStyle = s.ink;
+        g.fillRect(dx - 5, eave - 10, 10, 1);
+        g.fillRect(dx - 2, eave - 7, 4, 4);
         break;
       }
       case 'spire': {
-        // Crockets — the hooked leaves that climb a gothic spire's edges.
-        const shoulder = b.top + bh * 0.55;
-        for (let k = 1; k <= 4; k++) {
-          const f = k / 5;
-          const y = b.top + (shoulder - b.top) * f;
-          const hw = b.w * 0.5 * f;
-          for (const dir of [-1, 1]) {
-            g.beginPath();
-            g.moveTo(cx + dir * hw, y); g.lineTo(cx + dir * (hw + 4), y - 3);
-            g.stroke();
-          }
-        }
-        g.beginPath();
-        g.moveTo(cx, b.top); g.lineTo(cx, b.top - 9);
-        g.stroke();
+        // A finial, and nothing else. The crockets that used to climb the
+        // edges were four-pixel diagonal strokes, and at this size they read
+        // as grit blown across the sky.
+        g.fillRect(cx - 1, b.top - 8, 2, 8);
+        g.fillRect(cx - 3, b.top - 6, 6, 2);
         break;
       }
       case 'dome': {
         const dr = Math.min(b.w * 0.34, 26);
-        for (const f of [-0.6, 0, 0.6]) {
-          g.beginPath();
-          g.moveTo(cx + dr * f, b.top + dr);
-          g.quadraticCurveTo(cx + dr * f * 0.5, b.top + dr * 0.15, cx, b.top);
-          g.stroke();
-        }
         // The lantern on top. It is what makes a dome a dome and not a hill.
-        g.beginPath();
-        g.moveTo(cx - 3, b.top); g.lineTo(cx - 3, b.top - 8);
-        g.lineTo(cx + 3, b.top - 8); g.lineTo(cx + 3, b.top);
-        g.stroke();
+        g.fillStyle = s.fill;
+        g.fillRect(cx - 4, b.top - 8, 8, 8);
+        g.fillStyle = s.ink;
+        g.fillRect(cx - 5, b.top - 9, 10, 1);
+        g.fillRect(cx - 1, b.top - 13, 2, 4);
+        // A band at the springing, where the dome meets its drum.
+        g.fillRect(Math.round(cx - dr), Math.round(b.top + dr), Math.round(dr * 2), 2);
         break;
       }
       case 'clockTower': {
         const sw = Math.min(b.w, 30);
-        const sx = b.x + (b.w - sw) / 2;
-        g.beginPath();
-        g.moveTo(sx - 3, b.top + sw * 0.9); g.lineTo(sx + sw + 3, b.top + sw * 0.9);
-        g.stroke();
+        const sx = Math.round(b.x + (b.w - sw) / 2);
+        g.fillRect(sx - 3, Math.round(b.top + sw * 0.9), sw + 6, 2);
         // Hands, frozen. A clock that ticks in a painted city reads as a bug.
         const face = Math.max(9, Math.round(sw * 0.5));
-        const fx = sx + sw / 2;
-        const fy = b.top + sw + face / 2;
-        g.beginPath();
-        g.moveTo(fx, fy); g.lineTo(fx, fy - face * 0.34);
-        g.moveTo(fx, fy); g.lineTo(fx + face * 0.28, fy + face * 0.14);
-        g.stroke();
+        const fx = Math.round(sx + sw / 2);
+        const fy = Math.round(b.top + sw + face / 2);
+        g.fillRect(fx - 1, fy - Math.round(face * 0.34), 2, Math.round(face * 0.34));
+        g.fillRect(fx, fy, Math.round(face * 0.30), 2);
         break;
       }
       case 'factory': {
-        const sw = Math.max(5, b.w * 0.18);
-        const sx = b.x + b.w * 0.5 - sw / 2;
+        const sw = Math.max(5, Math.round(b.w * 0.18));
+        const sx = Math.round(b.x + b.w * 0.5 - sw / 2);
         // Iron bands, and the capping ring at the lip.
         for (const f of [0.12, 0.30]) {
-          const y = b.top + bh * f;
-          g.beginPath();
-          g.moveTo(sx - 1, y); g.lineTo(sx + sw + 1, y);
-          g.stroke();
+          g.fillRect(sx - 1, Math.round(b.top + bh * f), sw + 2, 2);
         }
-        g.beginPath();
-        g.moveTo(sx - 2, b.top + 2); g.lineTo(sx + sw + 2, b.top + 2);
-        g.stroke();
+        g.fillRect(sx - 2, b.top, sw + 4, 2);
         break;
       }
       case 'crane': {
-        const mx = b.x + b.w * 0.62;
-        const mastTop = b.top + bh * 0.05;
-        g.beginPath();
-        g.moveTo(mx, b.top + bh * 0.55);
-        g.lineTo(mx, mastTop);
-        g.lineTo(b.x + b.w * 0.08, mastTop + bh * 0.18);
-        g.stroke();
-        // The hook, and the tie that stops the jib folding back on itself.
-        g.beginPath();
-        g.moveTo(b.x + b.w * 0.18, mastTop + bh * 0.16);
-        g.lineTo(b.x + b.w * 0.18, mastTop + bh * 0.34);
-        g.moveTo(mx, mastTop + bh * 0.10);
-        g.lineTo(b.x + b.w * 0.30, mastTop + bh * 0.14);
-        g.stroke();
+        const mx = Math.round(b.x + b.w * 0.62);
+        const mastTop = Math.round(b.top + bh * 0.05);
+        // Mast, jib and hook, all as bars. A stroked lattice at this size is a
+        // smudge; a two-pixel bar is a crane.
+        g.fillRect(mx - 1, mastTop, 2, Math.round(bh * 0.5));
+        const jibX = Math.round(b.x + b.w * 0.08);
+        const jibY = Math.round(mastTop + bh * 0.18);
+        const steps = 6;
+        for (let k = 0; k <= steps; k++) {
+          const t = k / steps;
+          g.fillRect(
+            Math.round(mx + (jibX - mx) * t),
+            Math.round(mastTop + (jibY - mastTop) * t),
+            2, 2,
+          );
+        }
+        g.fillRect(jibX, jibY, 2, Math.round(bh * 0.16));
         break;
       }
     }

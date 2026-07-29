@@ -3,7 +3,6 @@ import { hexToRgb, mixRgb, rgbToHex } from '../ambient/interpolate';
 import type { Block } from './city';
 import type { Horizon } from './horizon';
 import { stream } from './rng';
-import { HATCH_ANGLES, hatch } from './hatch';
 
 /**
  * The sky was the largest surface in the frame and the only one with nothing in
@@ -23,13 +22,6 @@ export type Cloud = { lobes: Lobe[] };
 const STAR_COUNT = 90;
 /** Cloud bands, from the top of the sky downward. */
 const BANDS = 3;
-
-/**
- * Lighter than the far city's 0.18. Cloud is further off than anything standing
- * on the ground, and the hatch is what keeps it in the same drawing as the rest
- * of the plate rather than a flat shape pasted over it.
- */
-const CLOUD_DENSITY = 0.13;
 
 /**
  * Stars crowd toward the top of the sky: the ones near the horizon are the
@@ -199,21 +191,6 @@ export function drawSky(
     g.globalAlpha = 0.70;
     g.fillStyle = rgbToHex(mixRgb(local, sky0, 0.62));
     g.fill();
-
-    // Cloud is HATCHED, like everything else that is cut into the sky. The sky
-    // itself stays bare because it is the paper; a cloud is an object drawn on
-    // that paper, and a flat vector fill in a plate made entirely of line work
-    // is the one thing in the picture that does not belong to it.
-    //
-    // Lighter than the far city — cloud is further off than anything standing
-    // on the ground, and the same angle marks the same depth (§C.2).
-    g.save();
-    trace();
-    g.clip();
-    hatch(g, 0, bankTop, w, bankBot - bankTop, CLOUD_DENSITY, {
-      angle: HATCH_ANGLES.far, color: ink,
-    });
-    g.restore();
 
     // The side the moon is on, washed in with a gradient INSIDE the bank —
     // never stroked. `fill` merges overlapping subpaths; `stroke` does not, so

@@ -1,6 +1,5 @@
 import type { AmbientValues } from '../ambient/types';
 import type { Horizon } from './horizon';
-import { HATCH_ANGLES, hatch } from './hatch';
 import { stream } from './rng';
 
 /**
@@ -233,9 +232,6 @@ export function createWater(seed = 777): Water {
       // 6 — flat line work over the whole body. This is the engraver's water,
       //     and it is why the river reads as a surface rather than a photograph
       //     dropped into a drawing.
-      hatch(g, 0, top, w, depth, 0.34, {
-        angle: HATCH_ANGLES.water, color: v.deep,
-      });
 
       g.restore();
 

@@ -2,7 +2,6 @@ import type { AmbientValues } from '../ambient/types';
 import { hexToRgb, mixRgb, rgbToHex } from '../ambient/interpolate';
 import type { Block } from './city';
 import type { Horizon } from './horizon';
-import { HATCH_ANGLES } from './hatch';
 import { FAR_SCALE, drawSkyline, skyline } from './city';
 import { drawBridge } from './bridge';
 import { drawDeck } from './deck';
@@ -67,7 +66,6 @@ export function drawStatic(
   //     plate ever needs it — only the near band feeds smoke its chimneys.
   const far = skyline(w, hz.cityTop, hz.cityBot, Math.round(w * 17 + hz.h), FAR_SCALE);
   drawSkyline(g, far, hz.cityBot, {
-    angle: HATCH_ANGLES.far,
     fill: ladder.cityFar,
     ink,
     density: 0.18,
@@ -77,7 +75,6 @@ export function drawStatic(
 
   // 3 — far city, veiled by distance.
   drawSkyline(g, blocks, hz.cityBot, {
-    angle: HATCH_ANGLES.far,
     fill: ladder.city,
     ink,
     density: 0.34,

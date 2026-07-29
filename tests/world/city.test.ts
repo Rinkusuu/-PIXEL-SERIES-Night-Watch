@@ -90,36 +90,49 @@ describe('every shape carries its own detail', () => {
   };
 
   /**
-   * Stroked details per kind, counted from the code. The hatch contributes
-   * exactly one stroke at density 0.34 (it only crosses above 0.66), so the
-   * expected total is that one plus the details.
-   *
-   * Before this pass the whole vocabulary carried two entries: chimney pots on
-   * `flat` and a jib on `crane`. Everything else was a bare shape.
+   * Detail BLOCKS per kind, counted from the code. Nothing strokes any more —
+   * a one-pixel line is what stopped this reading as pixel art, so every
+   * detail is a filled rect and these are fillRect counts.
    */
-  const DETAIL_STROKES: Record<ShapeKind, number> = {
-    flat: 1,        // cornice
-    gable: 2,       // ridge + dormer
-    spire: 9,       // eight crockets + finial
-    dome: 4,        // three ribs + lantern
-    clockTower: 2,  // cornice band + hands
+  const DETAIL_BLOCKS: Record<ShapeKind, number> = {
+    flat: 6,        // three pots + tank + tank lid + cornice
+    gable: 3,       // dormer face, its ridge, its window
+    spire: 2,       // finial shaft and collar
+    dome: 4,        // lantern, its lid, its spike, springing band
+    clockTower: 3,  // cornice band + two hands
     factory: 3,     // two iron bands + capping ring
-    crane: 2,       // jib + hook and tie
+    crane: 9,       // mast + seven jib segments + hook
     gap: 0,         // nothing stands here; the slot is sky
   };
 
-  for (const kind of Object.keys(DETAIL_STROKES) as ShapeKind[]) {
-    it(`strokes ${DETAIL_STROKES[kind]} details on a ${kind}`, () => {
-      const c = countingCtx();
-      drawSkyline(c.g, [{ kind, x: 40, w: 60, top: 100, stackX: 70 }], 460, style);
-      // A gap draws nothing at all — not even the hatch pass.
-      const hatchPass = kind === 'gap' ? 0 : 1;
-      expect(c.strokes()).toBe(hatchPass + DETAIL_STROKES[kind]);
+  for (const kind of Object.keys(DETAIL_BLOCKS) as ShapeKind[]) {
+    it(`blocks ${DETAIL_BLOCKS[kind]} details on a ${kind}`, () => {
+      let rects = 0;
+      const g = new Proxy({} as CanvasRenderingContext2D, {
+        get(_t, key) {
+          if (key === 'fillRect') return () => { rects++; };
+          if (key === 'createLinearGradient' || key === 'createRadialGradient') {
+            return () => ({ addColorStop: () => {} });
+          }
+          return () => {};
+        },
+        set: () => true,
+      });
+      drawSkyline(g, [{ kind, x: 40, w: 60, top: 100, stackX: 70 }], 460, style);
+      expect(rects).toBe(DETAIL_BLOCKS[kind]);
     });
   }
 
+  it('never strokes a line anywhere in the city', () => {
+    // This is the whole of the pixel look at the drawing level: one-pixel
+    // strokes are what read as scratches over the silhouettes.
+    const c = countingCtx();
+    drawSkyline(c.g, skyline(1400, 100, 460, 17), 460, style);
+    expect(c.strokes()).toBe(0);
+  });
+
   it('leaves no shape that stands there bare', () => {
-    for (const [kind, n] of Object.entries(DETAIL_STROKES)) {
+    for (const [kind, n] of Object.entries(DETAIL_BLOCKS)) {
       if (kind === 'gap') continue;
       expect(n, kind).toBeGreaterThan(0);
     }
