@@ -111,22 +111,37 @@ tinggi tidak jadi moiré"), jadi `lineWidth` pecahan sah tanpa amandemen tambaha
 ```ts
 export const GAP_MIN = 1.6;
 export const GAP_MAX = 3.7;
-export const WEIGHT_MIN: number;   // ditentukan oleh kalibrasi §3.4
-export const WEIGHT_MAX: number;   // ditentukan oleh kalibrasi §3.4
+
+/** Lebar tinta yang diinginkan, px. Basis dan kemiringan — lihat §3.4. */
+export const WEIGHT_BASE = -0.035;
+export const WEIGHT_SLOPE = 0.72;
+
+/** Canvas tidak menggambar garis di bawah setengah piksel dengan andal. */
+export const MIN_STROKE = 0.5;
 
 /** Jarak antar-garis. Rumus sama, rentang yang jauh lebih sempit. */
 export function gapFor(value: number, minGap?: number, maxGap?: number): number;
 
-/** Lebar garis. Inilah yang sekarang membawa nada. */
+/** Lebar tinta yang DIINGINKAN, px. Boleh di bawah MIN_STROKE. */
 export function weightFor(value: number): number;
 
-/** lineWidth / gap. Satu-satunya angka yang boleh dipakai menilai kegelapan. */
+/** weightFor / gapFor. Satu-satunya angka yang boleh dipakai menilai kegelapan. */
 export function inkRatio(value: number): number;
 ```
 
-`globalAlpha` diratakan dari `0.55 + 0.45t` jadi `0.72 + 0.28t`. Berat garis sudah
-membawa nada; membiarkan alpha ikut membawanya berarti menghitung dua kali, dan ujung
-pucat akan hilang total di atas kabut yang pucat.
+`globalAlpha` berhenti jadi ramp nada dan berubah fungsi sepenuhnya. Ia sekarang
+**pengganti sub-piksel**, tidak lebih:
+
+```ts
+const want = weightFor(value);            // bisa 0.17 px
+const lw = Math.max(MIN_STROKE, want);
+g.lineWidth = lw;
+g.globalAlpha = want / lw;                // selalu ≤ 1
+```
+
+Tinta total tetap `lw × (want / lw) = want`, persis yang diminta, sementara `lineWidth`
+tidak pernah turun di bawah setengah piksel. Satu tombol membawa nada, bukan dua yang
+saling menghitung ulang. Ramp lama `0.55 + 0.45t` dihapus, bukan diratakan.
 
 Cross-hatch tetap mulai di `value > 0.66`. `minGap` lintasan kedua berubah dari
 `minGap + 1` jadi `minGap × 1.35` — penambahan tetap sebesar 1 px terlalu besar di
@@ -194,24 +209,71 @@ masing-masing. Ini tes murni aritmetika, tidak butuh canvas.
 ### 3.4 Kalibrasi — langkah wajib, bukan opsional
 
 Arsiran halus menaruh **jauh lebih banyak** tinta per satuan luas daripada arsiran
-kasar. Kalau `WEIGHT_MIN`/`WEIGHT_MAX` ditebak, pita jauh bisa jadi dua sampai tiga
-kali lebih pekat dan meruntuhkan tangga nilai yang baru selesai dibangun di ronde
-sebelumnya.
+kasar. Kalau konstantanya ditebak, pita jauh jadi berkali lipat lebih pekat dan
+meruntuhkan tangga nilai yang baru selesai dibangun di ronde sebelumnya.
 
-Hitungan di atas kertas tidak bisa dipakai untuk menyetelnya. Garis 0.3 px di canvas
-tidak dirender sebagai 30% garis 1 px — ia dirender sebagai garis abu-abu ter-antialias
-yang lebarnya tetap satu piksel, dan hubungannya dengan `lineWidth` tidak linear.
-Angkanya harus diukur di canvas sungguhan.
+Untungnya ini tidak perlu ditebak dan tidak perlu diukur di browser. Total tinta di
+dalam kotak berarsir punya bentuk tertutup:
 
-**Metode:** jalankan dev server, ambil piksel lewat Playwright, hitung luminans
-rata-rata satu kotak sampel di dalam tiap lapis (kota jauh, kota dekat, jembatan, dek),
-sebelum dan sesudah perubahan, pada palet dan ukuran yang sama.
+```
+tinta = (luas / gap) × lineWidth × alpha
+```
 
-**Kriteria lulus:** luminans rata-rata tiap lapis berada dalam **±15%** dari nilai
-sebelum perubahan. Yang berubah teksturnya, bukan nadanya.
+Jumlah panjang tali busur satu keluarga garis sejajar yang melintasi sebuah bidang sama
+dengan luas dibagi jarak antar-garis, dan itu **tidak bergantung sudut**. Jadi cakupan
+tinta per satuan luas adalah `weightFor(v) / gapFor(v)` — persis `inkRatio`. Kalibrasi
+berubah dari menyetel dengan tangan jadi mencocokkan empat angka, dan hasilnya bisa
+dikunci di unit test tanpa canvas sama sekali.
 
-Angka awal untuk memulai iterasi: `WEIGHT_MIN 0.30`, `WEIGHT_MAX 1.00`. Itu titik
-berangkat, bukan hasil.
+**Cakupan lama** (`lineWidth` 1, `alpha = 0.55 + 0.45t`):
+
+| lapis | `value` | gap lama | alpha lama | cakupan |
+|---|---|---|---|---|
+| kota jauh | 0.18 | 12.637 | 0.681 | 0.05388 |
+| kota dekat | 0.34 | 7.941 | 0.757 | 0.09532 |
+| sungai | 0.34 | 7.401 | 0.757 | 0.10228 |
+| jembatan | 0.52 | 5.004 | 0.831 | 0.16607 |
+| dek, utama | 0.74 | 3.364 | 0.912 | 0.27116 |
+| dek, silang | 0.235 | 6.883 | 0.709 | 0.10297 |
+| **dek, total** | | | | **0.37413** |
+
+Rasio kota jauh : dek adalah **1 : 6.9**. Rentang gap yang baru cuma menyediakan
+1 : 1.54, jadi lebar garis harus memasok sisanya. Garis lurus yang mencocokkan keempat
+titik itu melewati sumbu nol di bawah `value` terkecil yang pernah dipakai — karena itu
+konstantanya dinyatakan sebagai basis dan kemiringan, bukan minimum dan maksimum:
+
+```ts
+weightFor(v) = max(0.02, WEIGHT_BASE + WEIGHT_SLOPE · v^0.72)
+             = max(0.02, −0.035 + 0.72 · v^0.72)
+```
+
+`WEIGHT_BASE` negatif bukan kesalahan. Garisnya memotong nol di `v ≈ 0.011`, dan `hatch`
+sudah keluar lebih awal di `value ≤ 0.02`, jadi tidak ada lapis nyata yang pernah
+menyentuh daerah itu. Jepitan `0.02` ada supaya pemanggil baru tidak bisa menembusnya.
+
+**Cakupan baru** (`gap = 3.7 − 2.1t`, tinta = `weightFor`):
+
+| lapis | gap baru | tinta | cakupan | selisih |
+|---|---|---|---|---|
+| kota jauh | 3.089 | 0.174 | 0.05647 | +4.8% |
+| kota dekat | 2.734 | 0.296 | 0.10831 | +13.6% |
+| sungai | 2.734 | 0.296 | 0.10831 | +5.9% |
+| jembatan | 2.389 | 0.415 | 0.17360 | +4.5% |
+| **dek, total** | | | **0.34046** | −9.0% |
+
+Kota dekat dan sungai bertemu di angka yang sama karena `value` keduanya 0.34; kode
+lama memberi mereka `maxGap` berbeda tanpa alasan, dan menyatukannya justru yang benar.
+
+**Kriteria lulus:** setiap lapis berada dalam **±15%** dari cakupan lamanya. Simpangan
+terbesar adalah +13.6%, dan itu lolos. Yang berubah teksturnya, bukan nadanya.
+
+Tes kalibrasi menghitung kedua kolom dari konstanta di `hatch.ts` dan membandingkannya
+dengan tabel lama yang ditulis sebagai angka tetap. Kalau seseorang menggeser `GAP_MAX`
+atau salah satu konstanta berat, tes itu yang jatuh lebih dulu.
+
+**Verifikasi mata tetap wajib.** Bentuk tertutup di atas menjamin jumlah tintanya,
+bukan bahwa hasilnya terlihat benar. Setelah kalibrasi lolos, adegan tetap dilihat di
+browser pada keempat cuaca sebelum ronde ditutup.
 
 ### 3.5 Tes
 
