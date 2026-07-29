@@ -10,6 +10,16 @@ import { lanternAnchor } from './foreground';
 const TOTAL_LAMPS = 14;
 
 /**
+ * Fraction of a city's windows burning at the height of the night. Most of a
+ * Victorian city was dark after midnight, and the dark is what makes the lit
+ * ones mean anything — but three per cent is not a city, it is a power cut.
+ */
+const WINDOW_LIT_PEAK = 0.12;
+
+/** How much of that peak still burns at the quietest hour. */
+const WINDOW_LIT_FLOOR = 0.35;
+
+/**
  * Windows and lamps light up through the evening and go out toward dawn. Peak is
  * at 0.62 — the thickest fog, when the gas is doing the most work.
  */
@@ -76,8 +86,17 @@ export function lampSpots(
     }
   }
   if (candidates.length > 0) {
+    // `n` counts LAMPS, and it was calibrated when a whole building carried one
+    // window. A city now offers hundreds, so a flat fourteen would leave it 97%
+    // dark. Windows scale with how many there are; the gas standards do not.
+    //
+    // And they keep a floor. A lamplighter puts the gas out; nobody puts a
+    // household out, so the windows thin toward dawn rather than going dark.
+    // At the floor alone the city still reads as inhabited.
+    const curve = WINDOW_LIT_FLOOR + (1 - WINDOW_LIT_FLOOR) * (n / TOTAL_LAMPS);
+    const want = Math.round(candidates.length * WINDOW_LIT_PEAK * curve);
     const stride = scatterStride(candidates.length);
-    for (let k = 0; k < Math.min(n, candidates.length); k++) {
+    for (let k = 0; k < Math.min(want, candidates.length); k++) {
       out.push({
         ...candidates[(k * stride) % candidates.length]!, lit: true, kind: 'window',
       });
