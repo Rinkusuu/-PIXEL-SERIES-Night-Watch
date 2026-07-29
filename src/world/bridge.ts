@@ -112,7 +112,7 @@ export function drawBridge(
   g.save();
   g.clip('evenodd');
   hatch(g, 0, deckTop, w, hz.bridgeBot - deckTop, s.density, {
-    angle: HATCH_ANGLES.mid, color: s.ink, maxGap: 10,
+    angle: HATCH_ANGLES.mid, color: s.ink,
   });
   g.restore();
   g.restore();

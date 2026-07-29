@@ -101,7 +101,7 @@ export function drawDeck(
   // 3 — the near band is the densest hatching in the picture, into cross-hatch
   //     territory. Addendum §C.2.
   hatch(g, 0, hz.deckTop, w, hz.h - hz.deckTop, 0.74, {
-    angle: HATCH_ANGLES.near, color: s.ink, maxGap: 9,
+    angle: HATCH_ANGLES.near, color: s.ink,
   });
 
   // 4 — furniture. A mooring ring and the bollard the never-extinguished

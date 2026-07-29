@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
   GAP_MAX, GAP_MIN, HATCH_ANGLES, gapFor, hatch, inkRatio, reachFor, spreadFor,
   weightFor,
@@ -234,4 +235,16 @@ describe('sub-pixel ink is paid for with alpha', () => {
       expect(s.width * s.alpha, `value ${v}`).toBeCloseTo(weightFor(v), 6);
     }
   });
+});
+
+describe('no layer sets its own gap any more', () => {
+  // Five call sites across four files each picked a maxGap by hand: 17, 13, 12,
+  // 10, 9. That is the disease, not a tuning worth keeping — the palest layer
+  // was handed the widest gap, so the most distant thing in the picture got the
+  // most visible line work.
+  for (const f of ['layers.ts', 'city.ts', 'water.ts', 'bridge.ts', 'deck.ts']) {
+    it(`${f} leaves the gap to hatch.ts`, () => {
+      expect(readFileSync(`src/world/${f}`, 'utf8')).not.toContain('maxGap');
+    });
+  }
 });

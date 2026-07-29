@@ -175,7 +175,6 @@ export type SkylineStyle = {
   fill: string;
   ink: string;
   density: number;
-  maxGap: number;
 };
 
 export function drawSkyline(
@@ -195,7 +194,7 @@ export function drawSkyline(
     massing(g, b, bot);
     g.clip();
     hatch(g, b.x, b.top, b.w, bot - b.top, s.density, {
-      angle: s.angle, color: s.ink, maxGap: s.maxGap,
+      angle: s.angle, color: s.ink,
     });
     g.restore();
   }
