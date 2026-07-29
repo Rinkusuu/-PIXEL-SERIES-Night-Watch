@@ -3,7 +3,7 @@ import { hexToRgb, mixRgb, rgbToHex } from '../ambient/interpolate';
 import type { Block } from './city';
 import type { Horizon } from './horizon';
 import { stream } from './rng';
-import { HATCH_ANGLES, hatch } from './hatch';
+import { dither } from './dither';
 
 /**
  * The sky was the largest surface in the frame and the only one with nothing in
@@ -123,6 +123,73 @@ export function starVisibility(fogScale: number): number {
   return Math.max(0, 1 - fogScale * 0.55);
 }
 
+/**
+ * A bank's body colour at its own height. Shared by the plate pass and the
+ * occlusion pass below — computed twice and the cloud that crosses the moon is
+ * a different grey from the cloud either side of it.
+ */
+function bankBody(v: AmbientValues, hz: Horizon, spineY: number): string {
+  const sky0 = hexToRgb(v.sky[0]);
+  const t = Math.min(1, spineY / Math.max(1, hz.waterTop));
+  const local = mixRgb(sky0, hexToRgb(v.sky[1]), t);
+  return rgbToHex(mixRgb(local, sky0, 0.62));
+}
+
+/** Traces a set of lobes as ONE path. `moveTo` first or the subpaths join up. */
+function traceLobes(g: CanvasRenderingContext2D, lobes: readonly Lobe[]): void {
+  g.beginPath();
+  for (const l of lobes) {
+    g.moveTo(l.x + l.rx, l.y);
+    g.ellipse(l.x, l.y, l.rx, l.ry, 0, 0, Math.PI * 2);
+  }
+}
+
+/**
+ * Cloud drawn back OVER the moon, in the live pass.
+ *
+ * The banks live on the cached plate and the moon is painted every frame, so
+ * without this the moon is always in front — and as it climbs it would slide
+ * over cloud that ought to be swallowing it. Only the lobes near the disc are
+ * redrawn; the rest of the sky is already correct on the plate.
+ *
+ * The body keeps its 0.70 alpha, so a moon behind thin cloud still glows
+ * through it. That is the whole image.
+ */
+export function drawCloudsOverMoon(
+  g: CanvasRenderingContext2D,
+  w: number,
+  hz: Horizon,
+  v: AmbientValues,
+  moon: { x: number; y: number },
+  moonRadius: number,
+  ink: string,
+  seed: number,
+): void {
+  const reach = moonRadius * 4;
+  for (const cloud of cloudBanks(w, hz, seed + 991)) {
+    const near = cloud.lobes.filter(
+      (l) => Math.abs(l.y - moon.y) < reach + l.ry
+        && Math.abs(l.x - moon.x) < reach + l.rx,
+    );
+    if (near.length === 0) continue;
+
+    const spineY = cloud.lobes.reduce((s, l) => s + l.y, 0) / cloud.lobes.length;
+    const bankTop = Math.min(...near.map((l) => l.y - l.ry));
+    const bankBot = Math.max(...near.map((l) => l.y + l.ry));
+
+    g.save();
+    traceLobes(g, near);
+    g.globalAlpha = 0.70;
+    g.fillStyle = bankBody(v, hz, spineY);
+    g.fill();
+    g.globalAlpha = 1;
+    traceLobes(g, near);
+    g.clip();
+    dither(g, 0, bankTop, w, bankBot - bankTop, CLOUD_DENSITY, { color: ink });
+    g.restore();
+  }
+}
+
 export function drawSky(
   g: CanvasRenderingContext2D,
   w: number,
@@ -210,9 +277,7 @@ export function drawSky(
     g.save();
     trace();
     g.clip();
-    hatch(g, 0, bankTop, w, bankBot - bankTop, CLOUD_DENSITY, {
-      angle: HATCH_ANGLES.far, color: ink,
-    });
+    dither(g, 0, bankTop, w, bankBot - bankTop, CLOUD_DENSITY, { color: ink });
     g.restore();
 
     // The side the moon is on, washed in with a gradient INSIDE the bank —

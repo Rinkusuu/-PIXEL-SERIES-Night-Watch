@@ -90,9 +90,8 @@ describe('every shape carries its own detail', () => {
   };
 
   /**
-   * Stroked details per kind, counted from the code. The hatch contributes
-   * exactly one stroke at density 0.34 (it only crosses above 0.66), so the
-   * expected total is that one plus the details.
+   * Stroked details per kind, counted from the code. Tone is a dither fill
+   * now, so it contributes no strokes at all and these numbers stand alone.
    *
    * Before this pass the whole vocabulary carried two entries: chimney pots on
    * `flat` and a jib on `crane`. Everything else was a bare shape.
@@ -112,9 +111,7 @@ describe('every shape carries its own detail', () => {
     it(`strokes ${DETAIL_STROKES[kind]} details on a ${kind}`, () => {
       const c = countingCtx();
       drawSkyline(c.g, [{ kind, x: 40, w: 60, top: 100, stackX: 70 }], 460, style);
-      // A gap draws nothing at all — not even the hatch pass.
-      const hatchPass = kind === 'gap' ? 0 : 1;
-      expect(c.strokes()).toBe(hatchPass + DETAIL_STROKES[kind]);
+      expect(c.strokes()).toBe(DETAIL_STROKES[kind]);
     });
   }
 

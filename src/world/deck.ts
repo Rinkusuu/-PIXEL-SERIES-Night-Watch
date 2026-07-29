@@ -1,5 +1,5 @@
 import type { Horizon } from './horizon';
-import { HATCH_ANGLES, hatch } from './hatch';
+import { dither } from './dither';
 
 const BALUSTER_W = 8;
 const BALUSTER_GAP = 6;
@@ -100,9 +100,7 @@ export function drawDeck(
 
   // 3 — the near band is the densest hatching in the picture, into cross-hatch
   //     territory. Addendum §C.2.
-  hatch(g, 0, hz.deckTop, w, hz.h - hz.deckTop, 0.74, {
-    angle: HATCH_ANGLES.near, color: s.ink,
-  });
+  dither(g, 0, hz.deckTop, w, hz.h - hz.deckTop, 0.74, { color: s.ink });
 
   // 4 — furniture. A mooring ring and the bollard the never-extinguished
   //     lantern stands on (addendum §D.1).
