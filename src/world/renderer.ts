@@ -3,12 +3,11 @@ import { horizon } from './horizon';
 import { skyline, type Block } from './city';
 import { drawStatic, inkFor } from './layers';
 import { drawWalker } from './figure';
-import { drawQuay } from './quay';
 import { drawFog } from './fog';
 import { drawLamps, lampSpots, moonPos } from './bloom';
 import { SQUASH, createWater } from './water';
 import { drawForeground } from './foreground';
-import { VIGNETTE_INK, valueLadder } from './ladder';
+import { VIGNETTE_INK } from './ladder';
 import { drawWeather, effectsFor, type Weather } from './weather';
 import { createFrameClock } from './quality';
 
@@ -125,7 +124,6 @@ export function createWorldRenderer() {
     lastTime = timeMs;
     water.update(dt, motion);
 
-    const ladder = valueLadder(v, weather === 'rain' ? 0.18 : 0);
     const moon = moonPos(w, hz, progress);
     const lamps = lampSpots(w, hz, blocks, progress, fx, moon);
 
@@ -133,13 +131,6 @@ export function createWorldRenderer() {
     if (plate) target.drawImage(plate, 0, 0);
 
     water.draw(target, w, hz, v, mirror, lamps, timeMs, motion, notch);
-
-    // The canal walls go in AFTER the river. The river fills its band opaquely
-    // over the plate every frame, so a wall on the plate would be washed out
-    // below the waterline — and drawing them over it is what narrows the water
-    // to a channel in the first place. The lamp pass runs later still, so the
-    // windows lit in `lampSpots` land on top of the dark ones cut here.
-    drawQuay(target, w, hz, { wall: ladder.rail, dark: VIGNETTE_INK });
     drawWeather(target, w, hz, v, weather, blocks, water, timeMs, motion, notch);
     // The walker goes in BEFORE the fog, so the fog veils him the way it veils
     // everything else at that depth. Painted over it he would read as a decal.
