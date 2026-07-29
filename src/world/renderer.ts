@@ -1,7 +1,8 @@
 import type { AmbientValues } from '../ambient/types';
 import { horizon } from './horizon';
 import { skyline, type Block } from './city';
-import { drawStatic } from './layers';
+import { drawStatic, inkFor } from './layers';
+import { drawWalker } from './figure';
 import { drawFog } from './fog';
 import { drawLamps, lampSpots, moonPos } from './bloom';
 import { SQUASH, createWater } from './water';
@@ -131,6 +132,15 @@ export function createWorldRenderer() {
 
     water.draw(target, w, hz, v, mirror, lamps, timeMs, motion, notch);
     drawWeather(target, w, hz, v, weather, blocks, water, timeMs, motion, notch);
+    // The walker goes in BEFORE the fog, so the fog veils him the way it veils
+    // everything else at that depth. Painted over it he would read as a decal.
+    //
+    // Engraving ink, NOT the vignette's: he stands out at the bridge, and the
+    // frame-edge black would put him nearer than the stone he is on. And the
+    // same `timeMs` the barge reads — one clock for the world, or the two of
+    // them drift apart over a long session.
+    drawWalker(target, w, hz, v, inkFor(v), timeMs, motion);
+
     drawFog(target, w, hz, v, timeMs, motion, fx.fogScale);
     drawLamps(target, v, lamps, fx, timeMs, motion);
 

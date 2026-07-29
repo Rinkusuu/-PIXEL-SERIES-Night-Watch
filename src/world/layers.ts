@@ -7,6 +7,7 @@ import { FAR_SCALE, drawSkyline, skyline } from './city';
 import { drawBridge } from './bridge';
 import { drawDeck } from './deck';
 import { valueLadder } from './ladder';
+import { drawWatcher } from './figure';
 import { drawSky } from './sky';
 import { moonPos } from './bloom';
 import { effectsFor, type Weather } from './weather';
@@ -97,6 +98,11 @@ export function drawStatic(
     hazeTop: ladder.city,
     hazeBot: ladder.deck,
   });
+
+  // 4b — the watcher on the upstream bridge. Drawn after the bridge he stands
+  //      on and before the near stone, so the deck can never occlude him and he
+  //      can never float in front of the river.
+  drawWatcher(g, w, hz, v, ink);
 
   // 5 — the stone you are standing on.
   drawDeck(g, w, hz, { fill: ladder.deck, ink, rail: ladder.rail });
