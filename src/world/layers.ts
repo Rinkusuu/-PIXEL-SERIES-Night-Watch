@@ -4,7 +4,7 @@ import type { Block } from './city';
 import type { Horizon } from './horizon';
 import type { Weather } from './weather';
 import { HATCH_ANGLES } from './hatch';
-import { drawSkyline, skyline } from './city';
+import { FAR_SCALE, drawSkyline, skyline } from './city';
 import { drawBridge } from './bridge';
 import { drawDeck } from './deck';
 import { valueLadder } from './ladder';
@@ -52,7 +52,7 @@ export function drawStatic(
   //     signal of "further away" is that it is closer to the fog's own value.
   //     Generated here rather than in the renderer because nothing outside the
   //     plate ever needs it — only the near band feeds smoke its chimneys.
-  const far = skyline(w, hz.cityTop, hz.cityBot, Math.round(w * 17 + hz.h));
+  const far = skyline(w, hz.cityTop, hz.cityBot, Math.round(w * 17 + hz.h), FAR_SCALE);
   drawSkyline(g, far, hz.cityBot, {
     angle: HATCH_ANGLES.far,
     fill: ladder.cityFar,

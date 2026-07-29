@@ -58,9 +58,20 @@ function pickKind(r: number, heightF: number): ShapeKind {
   return 'dome';
 }
 
-export function skyline(w: number, top: number, bot: number, seed: number): Block[] {
+/**
+ * Width multiplier for the band behind the skyline. Distance does not merely
+ * fade a city, it multiplies it — roughly twice as many buildings, each about
+ * half as wide. Out there, density IS the detail.
+ */
+export const FAR_SCALE = 0.55;
+
+export function skyline(
+  w: number, top: number, bot: number, seed: number, scale = 1,
+): Block[] {
   const r = stream(seed);
   const span = bot - top;
+  const minW = Math.max(6, Math.round(MIN_W * scale));
+  const maxW = Math.max(minW + 4, Math.round(MAX_W * scale));
   const out: Block[] = [];
 
   let x = 0;
@@ -71,7 +82,7 @@ export function skyline(w: number, top: number, bot: number, seed: number): Bloc
   let lastKind: ShapeKind | null = null;
 
   while (x < w) {
-    const bw = Math.max(MIN_W, Math.round(MIN_W + r() * (MAX_W - MIN_W)));
+    const bw = Math.max(minW, Math.round(minW + r() * (maxW - minW)));
     const heightF = Math.pow(r(), 0.62);
     const roll = r();
 
@@ -380,27 +391,123 @@ export function drawSkyline(
     g.restore();
   }
 
-  // Details, stroked over the hatching.
+  // Details, stroked over the hatching and OUTSIDE the clip — a chimney pot, a
+  // finial and a dome lantern all live beyond the massing's own silhouette.
+  //
+  // Until now the whole city carried two of these: pots on `flat` and a jib on
+  // `crane`. Everything else was a bare shape, so the hatching was the only
+  // texture in the band and it became the subject.
   g.strokeStyle = s.ink;
   g.lineWidth = 1;
   for (const b of blocks) {
     const bh = bot - b.top;
-    if (b.kind === 'flat') {
-      // A row of chimney pots. Terraces without them read as filing cabinets.
-      g.fillStyle = s.fill;
-      for (let k = 0; k < 3; k++) {
-        const px = b.x + b.w * (0.2 + k * 0.3);
-        g.fillRect(px, b.top - 7, 3, 7);
+    const cx = b.x + b.w / 2;
+    switch (b.kind) {
+      case 'flat': {
+        // A row of chimney pots. Terraces without them read as filing cabinets.
+        g.fillStyle = s.fill;
+        for (let k = 0; k < 3; k++) {
+          g.fillRect(b.x + b.w * (0.2 + k * 0.3), b.top - 7, 3, 7);
+        }
+        g.beginPath();
+        g.moveTo(b.x, b.top + 9); g.lineTo(b.x + b.w, b.top + 9);
+        g.stroke();
+        break;
       }
-    }
-    if (b.kind === 'crane') {
-      const mx = b.x + b.w * 0.62;
-      const mastTop = b.top + bh * 0.05;
-      g.beginPath();
-      g.moveTo(mx, b.top + bh * 0.55);
-      g.lineTo(mx, mastTop);
-      g.lineTo(b.x + b.w * 0.08, mastTop + bh * 0.18);
-      g.stroke();
+      case 'gable': {
+        const eave = b.top + bh * 0.34;
+        g.beginPath();
+        g.moveTo(b.x - 2, eave); g.lineTo(cx, b.top - 3); g.lineTo(b.x + b.w + 2, eave);
+        g.stroke();
+        // One dormer, off centre: a symmetrical roof reads as a diagram.
+        const dx = b.x + b.w * 0.62;
+        g.beginPath();
+        g.moveTo(dx - 4, eave - 2); g.lineTo(dx - 4, eave - 9);
+        g.lineTo(dx, eave - 13); g.lineTo(dx + 4, eave - 9); g.lineTo(dx + 4, eave - 2);
+        g.stroke();
+        break;
+      }
+      case 'spire': {
+        // Crockets — the hooked leaves that climb a gothic spire's edges.
+        const shoulder = b.top + bh * 0.55;
+        for (let k = 1; k <= 4; k++) {
+          const f = k / 5;
+          const y = b.top + (shoulder - b.top) * f;
+          const hw = b.w * 0.5 * f;
+          for (const dir of [-1, 1]) {
+            g.beginPath();
+            g.moveTo(cx + dir * hw, y); g.lineTo(cx + dir * (hw + 4), y - 3);
+            g.stroke();
+          }
+        }
+        g.beginPath();
+        g.moveTo(cx, b.top); g.lineTo(cx, b.top - 9);
+        g.stroke();
+        break;
+      }
+      case 'dome': {
+        const dr = Math.min(b.w * 0.34, 26);
+        for (const f of [-0.6, 0, 0.6]) {
+          g.beginPath();
+          g.moveTo(cx + dr * f, b.top + dr);
+          g.quadraticCurveTo(cx + dr * f * 0.5, b.top + dr * 0.15, cx, b.top);
+          g.stroke();
+        }
+        // The lantern on top. It is what makes a dome a dome and not a hill.
+        g.beginPath();
+        g.moveTo(cx - 3, b.top); g.lineTo(cx - 3, b.top - 8);
+        g.lineTo(cx + 3, b.top - 8); g.lineTo(cx + 3, b.top);
+        g.stroke();
+        break;
+      }
+      case 'clockTower': {
+        const sw = Math.min(b.w, 30);
+        const sx = b.x + (b.w - sw) / 2;
+        g.beginPath();
+        g.moveTo(sx - 3, b.top + sw * 0.9); g.lineTo(sx + sw + 3, b.top + sw * 0.9);
+        g.stroke();
+        // Hands, frozen. A clock that ticks in a painted city reads as a bug.
+        const face = Math.max(9, Math.round(sw * 0.5));
+        const fx = sx + sw / 2;
+        const fy = b.top + sw + face / 2;
+        g.beginPath();
+        g.moveTo(fx, fy); g.lineTo(fx, fy - face * 0.34);
+        g.moveTo(fx, fy); g.lineTo(fx + face * 0.28, fy + face * 0.14);
+        g.stroke();
+        break;
+      }
+      case 'factory': {
+        const sw = Math.max(5, b.w * 0.18);
+        const sx = b.x + b.w * 0.5 - sw / 2;
+        // Iron bands, and the capping ring at the lip.
+        for (const f of [0.12, 0.30]) {
+          const y = b.top + bh * f;
+          g.beginPath();
+          g.moveTo(sx - 1, y); g.lineTo(sx + sw + 1, y);
+          g.stroke();
+        }
+        g.beginPath();
+        g.moveTo(sx - 2, b.top + 2); g.lineTo(sx + sw + 2, b.top + 2);
+        g.stroke();
+        break;
+      }
+      case 'crane': {
+        const mx = b.x + b.w * 0.62;
+        const mastTop = b.top + bh * 0.05;
+        g.beginPath();
+        g.moveTo(mx, b.top + bh * 0.55);
+        g.lineTo(mx, mastTop);
+        g.lineTo(b.x + b.w * 0.08, mastTop + bh * 0.18);
+        g.stroke();
+        // The hook, and the tie that stops the jib folding back on itself.
+        g.beginPath();
+        g.moveTo(b.x + b.w * 0.18, mastTop + bh * 0.16);
+        g.lineTo(b.x + b.w * 0.18, mastTop + bh * 0.34);
+        g.moveTo(mx, mastTop + bh * 0.10);
+        g.lineTo(b.x + b.w * 0.30, mastTop + bh * 0.14);
+        g.stroke();
+        break;
+      }
     }
   }
 }
