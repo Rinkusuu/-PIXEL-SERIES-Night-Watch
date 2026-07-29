@@ -4,13 +4,6 @@ import type { Weather } from './weather';
 import { defaultDeckTop } from './horizon';
 import { createWorldRenderer } from './renderer';
 
-/**
- * CSS pixels per drawn pixel. Three puts a 1512-wide window at a 504-wide
- * buffer — a genuine sprite-era resolution, which is the point: the chunk has
- * to be big enough that you read the grid, not merely a soft edge.
- */
-export const PIXEL_SCALE = 3;
-
 type Props = {
   values: AmbientValues;
   progress: number;
@@ -32,21 +25,11 @@ export function World({ values, progress, motion, weather, deckTop }: Props) {
     const g = cv.getContext('2d');
     if (!g) return;
 
-    const buffer = document.createElement('canvas');
-    const bg = buffer.getContext('2d');
-    if (!bg) return;
-
     const renderer = createWorldRenderer();
     let raf = 0;
     let w = 0;
     let h = 0;
 
-    // The world is drawn into a SMALL buffer and blown up with nearest
-    // neighbour. Everything keeps its existing CSS coordinates — the buffer's
-    // own transform is 1/PIXEL_SCALE — so no constant anywhere had to be
-    // retuned, and every curve, gradient and edge in the scene is quantised to
-    // a chunky grid on the way out. This is the whole of the pixel look; it is
-    // not something individual modules can opt into or forget.
     const resize = () => {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       w = Math.ceil(window.innerWidth);
@@ -55,12 +38,7 @@ export function World({ values, progress, motion, weather, deckTop }: Props) {
       cv.height = Math.ceil(h * dpr);
       cv.style.width = `${w}px`;
       cv.style.height = `${h}px`;
-      buffer.width = Math.ceil(w / PIXEL_SCALE);
-      buffer.height = Math.ceil(h / PIXEL_SCALE);
-      bg.setTransform(1 / PIXEL_SCALE, 0, 0, 1 / PIXEL_SCALE, 0, 0);
-      bg.imageSmoothingEnabled = false;
-      g.setTransform(1, 0, 0, 1, 0, 0);
-      g.imageSmoothingEnabled = false;
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
       renderer.invalidate();
     };
 
@@ -72,7 +50,7 @@ export function World({ values, progress, motion, weather, deckTop }: Props) {
 
     const loop = (t: number) => {
       const s = latest.current;
-      renderer.frame(bg, {
+      renderer.frame(g, {
         w,
         h,
         deckTop: s.deckTop || defaultDeckTop(h),
@@ -82,8 +60,6 @@ export function World({ values, progress, motion, weather, deckTop }: Props) {
         motion: s.motion,
         weather: s.weather,
       });
-      g.clearRect(0, 0, cv.width, cv.height);
-      g.drawImage(buffer, 0, 0, buffer.width, buffer.height, 0, 0, cv.width, cv.height);
       raf = requestAnimationFrame(loop);
     };
 

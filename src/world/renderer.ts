@@ -3,7 +3,6 @@ import { horizon } from './horizon';
 import { skyline, type Block } from './city';
 import { drawStatic, inkFor } from './layers';
 import { drawWalker } from './figure';
-import { drawCloudsOverMoon } from './sky';
 import { drawFog } from './fog';
 import { drawLamps, lampSpots, moonPos } from './bloom';
 import { SQUASH, createWater } from './water';
@@ -144,17 +143,6 @@ export function createWorldRenderer() {
 
     drawFog(target, w, hz, v, timeMs, motion, fx.fogScale);
     drawLamps(target, v, lamps, fx, timeMs, motion);
-
-    // Cloud back over the moon. The banks are on the plate and the moon is
-    // painted every frame, so without this it is always in front — and as it
-    // climbs it would slide over cloud that ought to be swallowing it. Only
-    // the lobes near the disc are redrawn; the rest of the sky is already
-    // right on the plate. Same seed as `drawStatic` passes, or a different
-    // sky would arrive over the moon than the one either side of it.
-    drawCloudsOverMoon(
-      target, w, hz, v, moon, 30 * fx.moonScale, inkFor(v),
-      Math.round(w * 13 + hz.h),
-    );
 
     // The near vignette goes LAST. It is the closest thing in the picture, so
     // nothing may be painted over it — least of all the river, which would wash

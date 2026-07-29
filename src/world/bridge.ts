@@ -1,5 +1,5 @@
 import type { Horizon } from './horizon';
-import { dither } from './dither';
+import { HATCH_ANGLES, hatch } from './hatch';
 
 /**
  * Rise of the arch as a fraction of its span. A semicircle rises by 0.5 and
@@ -115,7 +115,9 @@ export function drawBridge(
   g.fill('evenodd');
   g.save();
   g.clip('evenodd');
-  dither(g, 0, deckTop, w, hz.bridgeBot - deckTop, s.density, { color: s.ink });
+  hatch(g, 0, deckTop, w, hz.bridgeBot - deckTop, s.density, {
+    angle: HATCH_ANGLES.mid, color: s.ink,
+  });
   g.restore();
   g.restore();
 

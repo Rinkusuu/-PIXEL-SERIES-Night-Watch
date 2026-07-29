@@ -31,17 +31,11 @@ export function lampCount(progress: number, total = TOTAL_LAMPS): number {
   return Math.max(1, Math.min(total, Math.round(n)));
 }
 
-/**
- * The moon starts well clear of the roofs rather than sitting on them. It used
- * to begin at `skyBot` — the line where the city's own tops start — so for most
- * of a session it hung among the spires and never read as being in the sky at
- * all. Now it opens a third of the way up and climbs to the very top of the
- * frame's sky band.
- */
 export function moonPos(w: number, hz: Horizon, progress: number): { x: number; y: number } {
-  const low = hz.skyBot * 0.62;
-  const high = hz.cityTop * 0.22;
-  return { x: w * 0.78, y: low - progress * (low - high) };
+  return {
+    x: w * 0.78,
+    y: hz.skyBot - progress * (hz.skyBot - hz.cityTop * 0.4),
+  };
 }
 
 /**

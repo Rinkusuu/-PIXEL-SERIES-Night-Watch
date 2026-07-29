@@ -1,5 +1,5 @@
 import { stream } from './rng';
-import { dither } from './dither';
+import { hatch } from './hatch';
 
 /**
  * The old skyline was twenty-six equal-width blocks with random heights. The eye
@@ -411,6 +411,7 @@ function massing(g: CanvasRenderingContext2D, b: Block, bot: number): void {
 }
 
 export type SkylineStyle = {
+  angle: number;
   fill: string;
   ink: string;
   density: number;
@@ -440,7 +441,9 @@ export function drawSkyline(
     g.save();
     massing(g, b, bot);
     g.clip();
-    dither(g, b.x, b.top, b.w, bot - b.top, s.density, { color: s.ink });
+    hatch(g, b.x, b.top, b.w, bot - b.top, s.density, {
+      angle: s.angle, color: s.ink,
+    });
 
     // Openings, cut as dark holes while we are still clipped to the silhouette.
     // Addendum §C.2 says a glowing thing is a HOLE in the hatching; until now
