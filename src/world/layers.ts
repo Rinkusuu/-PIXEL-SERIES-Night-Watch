@@ -74,10 +74,13 @@ export function drawStatic(
     fill: ladder.bridge,
     ink,
     density: 0.52,
-    // Pulled well down toward the stone. At full horizon brightness the voids
-    // stop reading as openings and start reading as lamps.
-    hazeTop: rgbToHex(mixRgb(hexToRgb(v.sky[2]), hexToRgb(v.mid), 0.58)),
-    hazeBot: v.deep,
+    // What you see through an arch is the city's own feet, one rung further
+    // away than the stone around it — so it comes from the ladder, like every
+    // other depth. Hand-mixing it off `sky[2]` put the voids on a scale of
+    // their own, well above the fog, and a dozen arches lit up like a row of
+    // eggs instead of reading as openings.
+    hazeTop: ladder.city,
+    hazeBot: ladder.deck,
   });
 
   // 5 — the stone you are standing on.

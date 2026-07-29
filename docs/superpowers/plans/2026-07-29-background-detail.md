@@ -666,6 +666,43 @@ git -c user.name="rinkusu" -c user.email="linggom070905@gmail.com" \
 
 ---
 
+### Task 4b: The skyline stops being all domes and spires
+
+**Inserted during execution.** With the stripes gone the silhouettes were finally
+legible, and what they showed was a fairground: 21 of 31 blocks in the near band were
+spires or domes, and of the blocks tall enough to clear the fog, 16 were pointed or
+round against 1 boxy.
+
+The cause was structural, not a seed. `pickKind` decided shape from height, and its
+tall branch offered only `spire`, `factory` and `dome` — a box was forbidden from being
+tall. `heightF = r^0.62` skews upward, so about half of all blocks landed in that
+branch.
+
+This blocks Task 5 as much as it hurts the picture: a spire carries two lancets and a
+dome one arcade ring, so a city of spires has almost nowhere for a window to be. The
+shape mix has to be right before the lights can mean anything.
+
+**Files:** `src/world/city.ts` (`pickKind`, `dome` and `flat` massing),
+`src/world/layers.ts` (arch haze).
+
+- [x] Shape decided independently of height; boxes become the backbone
+      (`flat` 46%, `gable` 22%, `factory` 14%, `spire` 12%, `dome` 6% above the
+      waterfront). Height now only decides whether we are down among the sheds and
+      cranes.
+- [x] `dome` becomes a dome on a drum on a block. It was a semicircle the full width
+      of the plot (`r = w * 0.5`), so every dome swallowed its own building.
+- [x] `flat` gains a stepped parapet. Boxes are the backbone now, so a bare rectangle
+      would be everywhere.
+- [x] The upstream bridge's arch haze comes from the ladder (`ladder.city` to
+      `ladder.deck`) instead of a hand mix off `sky[2]`. That mix sat well above the
+      fog and lit a dozen arches up like a row of eggs.
+
+**Measured after:** tall boxy 13 against tall round-or-pointed 6, domes down from 8 to
+3. All 245 tests stayed green, including the tower-clustering and spire-aspect
+guarantees.
+
+---
+
 ### Task 5: `openings()` becomes a fact the city owns
 
 **Files:**

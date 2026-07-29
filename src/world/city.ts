@@ -36,12 +36,26 @@ export const MIN_SPIRE_ASPECT = 3.4;
  */
 export const SPIRE_MAX_W = 34;
 
-/** `heightF`: 0 is a low shed, 1 is the tallest thing on the block. */
+/**
+ * `heightF`: 0 is a low shed, 1 is the tallest thing on the block.
+ *
+ * Shape is decided almost independently of height, and that is the whole point.
+ * The old table let a tall block be ONLY a spire, a stack or a dome, so a box
+ * was structurally forbidden from being tall — twenty-one of thirty-one blocks
+ * came out pointed or round, and the skyline read as a fairground.
+ *
+ * A Victorian city is boxes. Warehouses, mills, tenement blocks: tall, flat,
+ * blunt. Spires and domes are the accents that mean something BECAUSE they are
+ * rare. Height now only decides whether we are down on the waterfront.
+ */
 function pickKind(r: number, heightF: number): ShapeKind {
-  // Cranes and sheds crowd the waterfront; spires and stacks stand behind them.
-  if (heightF < 0.30) return r < 0.35 ? 'crane' : r < 0.75 ? 'gable' : 'flat';
-  if (heightF > 0.66) return r < 0.58 ? 'spire' : r < 0.80 ? 'factory' : 'dome';
-  return r < 0.48 ? 'flat' : r < 0.80 ? 'gable' : 'dome';
+  // The waterfront itself: sheds and cranes, and nothing tall.
+  if (heightF < 0.22) return r < 0.42 ? 'crane' : r < 0.78 ? 'gable' : 'flat';
+  if (r < 0.46) return 'flat';
+  if (r < 0.68) return 'gable';
+  if (r < 0.82) return 'factory';
+  if (r < 0.94) return 'spire';
+  return 'dome';
 }
 
 export function skyline(w: number, top: number, bot: number, seed: number): Block[] {
@@ -134,10 +148,21 @@ function massing(g: CanvasRenderingContext2D, b: Block, bot: number): void {
       g.lineTo(x + w, bot); g.closePath();
       break;
     case 'dome': {
-      const r = w * 0.5;
-      g.moveTo(x, bot); g.lineTo(x, top + r);
-      g.arc(x + r, top + r, r, Math.PI, 0);
-      g.lineTo(x + w, bot); g.closePath();
+      // A dome on a drum on a block — not a bubble the width of the plot. At
+      // `w * 0.5` every dome swallowed its own building and the skyline filled
+      // up with half-circles.
+      const cx = x + w / 2;
+      const dr = Math.min(w * 0.34, 26);
+      const shoulder = top + dr * 2.1;
+      g.moveTo(x, bot);
+      g.lineTo(x, shoulder);
+      g.lineTo(cx - dr, shoulder);
+      g.lineTo(cx - dr, top + dr);
+      g.arc(cx, top + dr, dr, Math.PI, 0);
+      g.lineTo(cx + dr, shoulder);
+      g.lineTo(x + w, shoulder);
+      g.lineTo(x + w, bot);
+      g.closePath();
       break;
     }
     case 'clockTower': {
@@ -165,7 +190,18 @@ function massing(g: CanvasRenderingContext2D, b: Block, bot: number): void {
       break;
     case 'flat':
     default:
-      g.rect(x, top, w, bh);
+      // A parapet, not a bare rectangle. One step in from each end is enough to
+      // say the roof has an edge instead of a cut line — and boxes are now the
+      // backbone of the skyline, so a bare one would be everywhere.
+      g.moveTo(x, bot);
+      g.lineTo(x, top + 5);
+      g.lineTo(x + w * 0.14, top + 5);
+      g.lineTo(x + w * 0.14, top);
+      g.lineTo(x + w * 0.86, top);
+      g.lineTo(x + w * 0.86, top + 5);
+      g.lineTo(x + w, top + 5);
+      g.lineTo(x + w, bot);
+      g.closePath();
       break;
   }
 }
