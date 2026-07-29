@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { horizon } from '../../src/world/horizon';
 import { openings, skyline } from '../../src/world/city';
 import { effectsFor } from '../../src/world/weather';
-import { lampSpots, moonPos } from '../../src/world/bloom';
+import { drawLamps, lampSpots, moonPos } from '../../src/world/bloom';
+import { resolve } from '../../src/ambient/interpolate';
+import { NIGHT_KEYS } from '../../src/ambient/keyframes';
+import { gradesFor } from '../../src/ambient/grade';
 import { lanternAnchor } from '../../src/world/foreground';
 
 const hz = horizon(900, 900 * 0.66);
@@ -145,6 +148,47 @@ describe('the moon carries the picture', () => {
     const moon = spots.find((s) => s.kind === 'moon')!;
     const lamp = spots.find((s) => s.kind === 'bridge')!;
     expect(moon.r).toBeGreaterThan(lamp.r * 7);
+  });
+
+  it('wears a corona that is moisture, not light', () => {
+    // The corona swells with the fog and all but vanishes on the clearest
+    // night. That is what ties the weather to the moon without a knob for it.
+    const radii: number[] = [];
+    const alphas: number[] = [];
+    const g = new Proxy({} as CanvasRenderingContext2D, {
+      get(_t, key) {
+        if (key === 'createRadialGradient') {
+          return (_x0: number, _y0: number, _r0: number, _x1: number, _y1: number, r1: number) => {
+            radii.push(r1);
+            return { addColorStop: () => {} };
+          };
+        }
+        return () => {};
+      },
+      set: (_t, key, value) => {
+        if (key === 'globalAlpha') alphas.push(value as number);
+        return true;
+      },
+    });
+
+    const draw = (weather: Parameters<typeof effectsFor>[0]) => {
+      radii.length = 0; alphas.length = 0;
+      const v = resolve(NIGHT_KEYS, 0.35, gradesFor(['calm']));
+      const spots = lampSpots(1200, hz, blocks, 0.35, effectsFor(weather),
+                              moonPos(1200, hz, 0.35));
+      drawLamps(g, v, spots.filter((s) => s.kind === 'moon'), effectsFor(weather), 0, 0);
+      return { radii: [...radii], alphas: [...alphas] };
+    };
+
+    const clear = draw('clear');
+    const fog = draw('fog');
+
+    // Two blobs for the moon: corona first, then the tight halo.
+    expect(clear.radii.length).toBe(2);
+    expect(clear.radii[0]).toBeGreaterThan(clear.radii[1]!);
+    expect(clear.alphas[0]).toBeLessThan(clear.alphas[1]!);
+    // And it grows in the fog.
+    expect(fog.radii[0]).toBeGreaterThan(clear.radii[0]!);
   });
 
   it('grows again on a full moon', () => {

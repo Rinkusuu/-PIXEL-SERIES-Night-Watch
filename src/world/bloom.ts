@@ -184,6 +184,15 @@ export function drawLamps(
     const rad = s.r * pulse;
 
     if (s.kind === 'moon') {
+      // The corona is moisture, not light. It swells with the fog and all but
+      // vanishes on the clearest night, which ties the weather to the moon
+      // without adding a knob for it. Drawn FIRST so the tight halo and the
+      // hard disc sit on top of it.
+      glowBlob(
+        g, s.x, s.y,
+        rad * HALO.moon * 2.6 * (0.6 + fx.fogScale * 0.5),
+        v.glow, 0.05 + fx.fogScale * 0.05,
+      );
       glowBlob(g, s.x, s.y, rad * HALO.moon, v.glow, ALPHA.moon + v.lum * 0.1 + fx.lumLift);
       // A hard, near-white disc. A soft dim one reads as a smudge, and the
       // reference's moon is the brightest thing on screen by a wide margin.

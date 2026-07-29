@@ -2,12 +2,14 @@ import type { AmbientValues } from '../ambient/types';
 import { hexToRgb, mixRgb, rgbToHex } from '../ambient/interpolate';
 import type { Block } from './city';
 import type { Horizon } from './horizon';
-import type { Weather } from './weather';
 import { HATCH_ANGLES } from './hatch';
 import { FAR_SCALE, drawSkyline, skyline } from './city';
 import { drawBridge } from './bridge';
 import { drawDeck } from './deck';
 import { valueLadder } from './ladder';
+import { drawSky } from './sky';
+import { moonPos } from './bloom';
+import { effectsFor, type Weather } from './weather';
 
 /**
  * Engraving ink. Pushed most of the way to black so the hatching still reads
@@ -46,6 +48,15 @@ export function drawStatic(
   const ink = inkFor(v);
   const wet = weather === 'rain' ? 0.18 : 0;
   const ladder = valueLadder(v, wet);
+
+  // 1b — what is IN the sky. Stars, the gas dome over the city, and the cloud
+  //      banks, in that order back to front. The moon's position comes from
+  //      bloom.ts rather than a second guess here: the clouds are lit from it,
+  //      and a rim on the wrong side is worse than no rim.
+  drawSky(
+    g, w, hz, v, blocks, moonPos(w, hz, progress),
+    effectsFor(weather).fogScale, Math.round(w * 13 + hz.h),
+  );
 
   // 2 — the band BEHIND the skyline. Its own seed, so its towers land between
   //     the near ones rather than behind them, and a much paler fill: the whole
