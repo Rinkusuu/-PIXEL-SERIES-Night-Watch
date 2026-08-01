@@ -4,6 +4,7 @@ import { skyline, type Block } from './city';
 import { drawStatic, inkFor } from './layers';
 import { drawWalker } from './figure';
 import { drawFog } from './fog';
+import { drawShafts } from './shafts';
 import { drawLamps, lampSpots, moonPos } from './bloom';
 import { SQUASH, createWater } from './water';
 import { drawForeground } from './foreground';
@@ -142,6 +143,11 @@ export function createWorldRenderer() {
     drawWalker(target, w, hz, v, inkFor(v), timeMs, motion);
 
     drawFog(target, w, hz, v, timeMs, motion, fx.fogScale);
+    // Between the fog and the halos, and it has to be exactly there. A beam is
+    // lit fog, so the fog must already be down for it to cut into; and the halo
+    // is the beam's source, so it must go on top or the lamp ends up behind its
+    // own light. See shafts.ts.
+    drawShafts(target, hz, v, lamps, fx.fogScale);
     drawLamps(target, v, lamps, fx, timeMs, motion);
 
     // The near vignette goes LAST. It is the closest thing in the picture, so
