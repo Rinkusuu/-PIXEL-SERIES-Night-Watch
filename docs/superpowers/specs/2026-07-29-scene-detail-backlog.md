@@ -1,7 +1,9 @@
 # Night Watch — Antrean Detail Adegan
 
 **Tanggal:** 2026-07-29
-**Status:** disetujui seluruhnya, dikerjakan **setelah** `2026-07-29-background-detail-design.md` selesai
+**Status:** **DIGANTIKAN** oleh `2026-08-01-scene-detail-queue.md`. Ronde 1–3
+selesai; sebagian klaim untuk ronde 4–8 sudah tidak benar terhadap kode sekarang.
+Dokumen ini disimpan sebagai catatan, bukan sebagai antrean yang dikerjakan.
 **Asal:** audit menyeluruh `src/world/` atas permintaan pengguna
 
 Semua item di sini sudah disetujui untuk dikerjakan. Dokumen ini bukan daftar usul —
