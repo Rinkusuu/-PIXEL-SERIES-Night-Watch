@@ -111,10 +111,13 @@ export function drawStatic(
   //      place it can be seen at all, and the reason each arch stops being a
   //      hole with a gradient in it. See bank.ts.
   drawBank(g, w, hz, {
-    // Between the city's rung and the bridge's. Give it the bridge's own value
-    // and it vanishes into the arch surround; give it the city's and it stops
-    // reading as a nearer edge than the buildings behind it.
-    wall: rgbToHex(mixRgb(hexToRgb(ladder.city), hexToRgb(ladder.bridge), 0.45)),
+    // Between the city's rung and the bridge's, but MOST of the way to the
+    // bridge. At 0.45 the quay now fills the whole arch void, and a void that
+    // much paler than the stone around it turns a bridge into a row of lit
+    // eggs — the exact failure the void's own colour was moved onto the ladder
+    // to fix. It has to be readably behind the stone and no further: what
+    // carries the depth is the coping line and the wet foot, not the value gap.
+    wall: rgbToHex(mixRgb(hexToRgb(ladder.city), hexToRgb(ladder.bridge), 0.72)),
     ink,
     dark: ladder.deck,
   }, Math.round(w * 7 + hz.h));
@@ -125,13 +128,15 @@ export function drawStatic(
     fill: ladder.bridge,
     ink,
     density: 0.52,
-    // What you see through an arch is the city's own feet, one rung further
-    // away than the stone around it — so it comes from the ladder, like every
-    // other depth. Hand-mixing it off `sky[2]` put the voids on a scale of
-    // their own, well above the fog, and a dozen arches lit up like a row of
-    // eggs instead of reading as openings.
+    // What you see through an arch is the far bank, further away than the stone
+    // around it — so both stops come from the ladder, like every other depth,
+    // and both are PALER than `bridge`. The lower stop is the paler of the two:
+    // the springing is the waterline, the furthest point in the picture and the
+    // height fog pools at. It used to be handed `deck` — the nearest rung on
+    // the whole ladder — which made each void darker at the bottom than the
+    // stone surrounding it. See `BridgeStyle.hazeBot`.
     hazeTop: ladder.city,
-    hazeBot: ladder.deck,
+    hazeBot: ladder.cityFar,
   });
 
   // 4b — the watcher on the upstream bridge. Drawn after the bridge he stands

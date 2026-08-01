@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { drawBank } from '../../src/world/bank';
+import { drawBank, quayTop } from '../../src/world/bank';
+import { archCrown } from '../../src/world/bridge';
 import { horizon } from '../../src/world/horizon';
+import { LADDER_STOPS } from '../../src/world/ladder';
 import { countingCtx } from '../helpers/counting-ctx';
 
 const hz = horizon(862, Math.round(862 * 0.66));
@@ -14,6 +16,20 @@ describe('the far bank', () => {
     // arch voids are the only place anything behind the bridge can be seen.
     expect(hz.bridgeTop).toBeLessThan(hz.cityBot);
     expect(hz.cityBot).toBeLessThan(hz.bridgeBot);
+  });
+
+  it('walls off every storey the arches would otherwise show', () => {
+    // The wall has to reach the underside of the roadway. Any gap between its
+    // coping and the arch crown is a strip of the city's lower floors, at the
+    // same window scale as the towers standing ABOVE the roadway — which is
+    // what made the city read as standing in the river. At every viewport.
+    for (const h of [520, 700, 862, 1100, 1600]) {
+      for (const f of [0.54, 0.66, 0.8]) {
+        const z = horizon(h, Math.round(h * f));
+        expect(quayTop(z)).toBeLessThanOrEqual(archCrown(z));
+        expect(quayTop(z)).toBeLessThan(z.cityBot);
+      }
+    }
   });
 
   it('keeps everything it draws ABOVE the waterline', () => {
@@ -60,6 +76,20 @@ describe('the far bank', () => {
     const src = readFileSync('src/world/layers.ts', 'utf8');
     expect(src.indexOf('drawBank(')).toBeLessThan(src.indexOf('drawBridge('));
     expect(src.indexOf('drawSkyline(')).toBeLessThan(src.indexOf('drawBank('));
+  });
+
+  it('veils the arch voids toward the fog, never toward the near stone', () => {
+    // Aerial perspective, and it is not a matter of taste: the springing of an
+    // arch is the far bank's waterline, the furthest point in the picture. Both
+    // haze stops must sit further from the ink than `bridge`, and the LOWER
+    // stop must be the paler of the two. `hazeBot` was `deck` — the nearest
+    // rung on the ladder — and every arch went darker at the bottom than the
+    // stone around it.
+    const src = readFileSync('src/world/layers.ts', 'utf8');
+    const top = /hazeTop:\s*ladder\.(\w+)/.exec(src)?.[1] as keyof typeof LADDER_STOPS;
+    const bot = /hazeBot:\s*ladder\.(\w+)/.exec(src)?.[1] as keyof typeof LADDER_STOPS;
+    expect(LADDER_STOPS[bot]).toBeLessThan(LADDER_STOPS[top]);
+    expect(LADDER_STOPS[top]).toBeLessThan(LADDER_STOPS.bridge);
   });
 
   it('lets the bank show through the arches instead of painting over it', () => {

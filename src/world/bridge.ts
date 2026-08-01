@@ -13,6 +13,24 @@ const SPAN_TARGET = 120;
 
 export type Pier = { x: number; w: number; top: number; bot: number };
 
+/**
+ * Thickness of the roadway slab, and so the line the arches are cut up TO.
+ *
+ * Exported because `bank.ts` has to build its quay to exactly this line. A
+ * second copy of the number is a second chance for a strip of city storeys to
+ * survive between the wall's coping and the arch crown — and a strip of
+ * full-scale windows below the roadway is precisely what made the city read as
+ * standing in the river. Same rule as `horizon()`, `setbackOf`, `eaveOf`.
+ */
+export function roadwayDepth(hz: Horizon): number {
+  return Math.max(6, Math.round((hz.bridgeBot - hz.bridgeTop) * 0.16));
+}
+
+/** The highest point of an arch void — the underside of the roadway. */
+export function archCrown(hz: Horizon): number {
+  return hz.bridgeTop + roadwayDepth(hz);
+}
+
 export function piers(w: number, hz: Horizon): Pier[] {
   const count = Math.max(2, Math.round(w / SPAN_TARGET) + 1);
   const step = w / (count - 1);
@@ -33,9 +51,18 @@ export type BridgeStyle = {
   fill: string;
   ink: string;
   density: number;
-  /** Haze seen THROUGH an arch: the sky's horizon stop at the crown… */
+  /** Haze seen THROUGH an arch, at the crown. */
   hazeTop: string;
-  /** …dropping to the river's own colour at the springing. */
+  /**
+   * …and at the springing, where it must be PALER than `hazeTop`, never darker.
+   *
+   * The bottom of an arch void is the waterline on the far bank — the furthest
+   * point in the whole picture, and the height at which fog pools. Aerial
+   * perspective takes it toward the fog. This stop used to be handed the
+   * `deck` rung, the NEAREST value on the ladder, which made the bottom of
+   * every arch darker than the stone around it: each opening read as a hole
+   * into a cellar rather than a window onto distance.
+   */
   hazeBot: string;
 };
 
@@ -74,10 +101,10 @@ export function drawBridge(
 ): void {
   const p = piers(w, hz);
   const deckTop = hz.bridgeTop;
-  const deckH = Math.max(6, Math.round((hz.bridgeBot - hz.bridgeTop) * 0.16));
+  const deckH = roadwayDepth(hz);
   // The arch is cut UP into the spandrel, so its crown sits just under the
   // roadway — not at some line partway down it.
-  const crownY = deckTop + deckH;
+  const crownY = archCrown(hz);
 
   const spans: { x0: number; x1: number }[] = [];
   for (let i = 0; i < p.length - 1; i++) {
@@ -96,8 +123,12 @@ export function drawBridge(
   const haze = g.createLinearGradient(0, crownY, 0, hz.bridgeBot);
   haze.addColorStop(0, s.hazeTop);
   haze.addColorStop(1, s.hazeBot);
+  //     Light: the quay behind these arches is dressed stone with a coping, a
+  //     wet foot and water stairs on it, and at 0.42 the wash flattened all
+  //     three into one bar of colour. Haze is supposed to veil an opening, not
+  //     erase what is in it.
   g.save();
-  g.globalAlpha = 0.42;
+  g.globalAlpha = 0.24;
   g.beginPath();
   for (const sp of spans) archPath(g, sp.x0, sp.x1, crownY, hz.bridgeBot);
   g.fillStyle = haze;
