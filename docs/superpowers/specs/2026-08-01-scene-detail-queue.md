@@ -353,8 +353,10 @@ persis terbalik. Ini pelanggaran aturan B di tempat lain, dan sama dengan bug
 8.2  gumpalan kabut                                                  SELESAI
 7.1  7.2  7.3  7.4  bingkai depan                                    SELESAI
 ─────────────────────────────────── sisa, semua perlu diukur dulu
-6.3  6.4  6.5  sett, kerb, baluster, perabot
-5.2  5.3  5.4  tongkang, lalu lintas sungai, garis air
+6.6  baluster: newel dan jeda gerbang                                SELESAI
+5.2  5.3  5.4  tongkang, lalu lintas sungai, garis air              SELESAI
+6.3  6.4       sett, kerb                   DICORET — dek tertutup panel
+6.5  perabot                                DIKECILKAN — lihat §6.5
 ```
 
 Tiga cacat lebih dulu, karena memperbaiki yang rusak selalu lebih murah daripada

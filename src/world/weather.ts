@@ -163,6 +163,18 @@ export function drawWeather(
     // Hull and mast as one path, written once and traced twice — once upright,
     // once inside the mirror transform. Two copies of this outline is two
     // chances for the reflection to stop matching the thing casting it.
+    // A hull, a mast stump and a bow light was the entire vessel — the one
+    // moving object in the scene and the least furnished thing in it. A working
+    // Thames lighter has an aft cabin she is steered from and a stack; without
+    // them she is a plank with a lamp on it, and there is nothing to tell you
+    // which end is which or that anybody is aboard.
+    const cabinW = Math.round(bw * 0.22);
+    const cabinH = Math.round(bh * 1.5);
+    const cabinX = Math.round(x + bw * 0.10);
+    const stackW = Math.max(2, Math.round(bw * 0.045));
+    const stackX = Math.round(cabinX + cabinW * 0.62);
+    const stackH = Math.round(bh * 2.4);
+
     const body = () => {
       g.beginPath();
       g.moveTo(x, y);
@@ -172,6 +184,12 @@ export function drawWeather(
       g.closePath();
       g.fill();
       g.fillRect(x + bw * 0.62, y - mastH, mastW, mastH);
+      // Cabin aft — she is travelling bow-right, so aft is the left end.
+      g.fillRect(cabinX, y - cabinH, cabinW, cabinH);
+      // Roof overhanging a pixel each side, the same eaves trick the gables
+      // use: an overhang is what separates a roof from a lid.
+      g.fillRect(cabinX - 1, y - cabinH - 1, cabinW + 2, 2);
+      g.fillRect(stackX, y - stackH, stackW, stackH);
     };
 
     // The reflection, FIRST, so the hull sits on top of its own image.
@@ -229,6 +247,41 @@ export function drawWeather(
     g.globalAlpha = 0.42;
     g.fillStyle = col;
     g.fillRect(lampX + Math.sin(timeMs / 700) * motion, wl, 3, bh * 4);
+    g.restore();
+
+    // Her smoke, trailing ASTERN — she is making way, so it lies down behind
+    // her rather than standing up. On the same soot-to-fog ramp the factory
+    // stacks use: dark out of the pipe, fog's own colour once it has spread.
+    // A second rule for the same substance is how the two end up disagreeing.
+    g.save();
+    for (let k = 0; k < 7; k++) {
+      const age = (k + (motion === 0 ? 0 : (t * 0.6) % 1)) / 7;
+      g.fillStyle = rgbToHex(mixRgb(soot, spent, Math.min(1, age * 1.5)));
+      g.globalAlpha = (1 - age) * 0.16;
+      g.beginPath();
+      g.arc(
+        stackX - age * bw * 0.5,
+        y - stackH - age * bh * 1.6 + Math.sin(t + k) * motion,
+        1.5 + age * bh * 0.9, 0, Math.PI * 2,
+      );
+      g.fill();
+    }
+    g.restore();
+
+    // Her wake: the water she has already gone through, opening out behind the
+    // stern. The bow wave was there from the start and rings the water ahead of
+    // her; this is the other half, and without it she reads as being towed.
+    g.save();
+    g.globalAlpha = 0.3;
+    g.fillStyle = v.lift;
+    for (let k = 1; k <= 10; k++) {
+      const spread = k * 1.9;
+      const wy = wl + k;
+      if (wy >= hz.waterBot) break;
+      g.globalAlpha = 0.3 * (1 - k / 10);
+      g.fillRect(Math.round(x + bw * 0.08 - spread), wy, 2, 1);
+      g.fillRect(Math.round(x + bw * 0.08 + spread), wy, 2, 1);
+    }
     g.restore();
     if (Math.floor(timeMs / 400) !== Math.floor((timeMs - 16) / 400)) {
       water.ring(x + bw, y + bh, 0.7);

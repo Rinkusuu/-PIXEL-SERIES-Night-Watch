@@ -97,6 +97,17 @@ export function createWater(seed = 777): Water {
     speed: 0.25 + r() * 0.5,
   }));
 
+  // Moored craft, laid out once. Fractions of the river rather than pixels, so
+  // the reach keeps its traffic through a resize — the same rule the ripple
+  // field above follows and for the same reason.
+  const traffic = Array.from({ length: 7 }, (_, i) => ({
+    fx: 0.05 + r() * 0.9,
+    // Biased toward the far bank. Craft moored at your feet would crowd the
+    // one part of the river the reflection column and the barge both need.
+    fy: Math.pow(r(), 1.8) * 0.55,
+    buoy: i >= 5,
+  }));
+
   return {
     ring(x, y, strength = 1) {
       live.push({ x, y, r: 1, life: 0, max: 0.9 * strength });
@@ -239,6 +250,48 @@ export function createWater(seed = 777): Water {
 
       g.restore();
 
+      // 6a — moored craft. The river had exactly one boat on it and that boat
+      //      was only there for ninety seconds every fifteen minutes; the rest
+      //      of the time the busiest waterway in the world was empty.
+      //
+      //      Lighters tied up along the reach, and a buoy or two. All static,
+      //      all from one seed laid down when the module was created, so they
+      //      neither drift nor reshuffle on a resize.
+      //
+      //      Drawn HERE rather than on the plate because everything from
+      //      `waterTop` down is repainted opaquely by this pass every frame —
+      //      the same reason the wash below is here and not in `bridge.ts`.
+      g.save();
+      for (const c of traffic) {
+        const cx = c.fx * w;
+        // Further up the reach means smaller and paler: the river recedes just
+        // as hard as the city does, and a full-size lighter at the far bank
+        // would sit in front of the bridge it is moored beside.
+        const near = c.fy;
+        const cy = top + depth * c.fy;
+        const bw = Math.round(6 + near * 26);
+        const bh = Math.max(2, Math.round(bw * 0.22));
+        g.globalAlpha = 0.30 + near * 0.45;
+        g.fillStyle = v.deep;
+        if (c.buoy) {
+          g.fillRect(Math.round(cx - 1), Math.round(cy - bh * 1.6), 2, Math.round(bh * 2.6));
+          continue;
+        }
+        g.beginPath();
+        g.moveTo(cx - bw / 2, cy);
+        g.lineTo(cx + bw / 2, cy);
+        g.lineTo(cx + bw * 0.4, cy + bh);
+        g.lineTo(cx - bw * 0.4, cy + bh);
+        g.closePath();
+        g.fill();
+        // A mast stump, on the ones big enough to carry one.
+        if (bw > 16) g.fillRect(Math.round(cx + bw * 0.2), Math.round(cy - bh * 2), 1, bh * 2);
+        // …and its own short reflection, squashed like everything else.
+        g.globalAlpha *= 0.4;
+        g.fillRect(Math.round(cx - bw * 0.4), Math.round(cy + bh), bw * 0.8, Math.max(1, bh));
+      }
+      g.restore();
+
       // 6b — the wash off the piers. A pier standing in a moving river throws a
       //      V downstream from its cutwater, and without one the piers read as
       //      posts set into a painted surface rather than as stone the current
@@ -273,12 +326,26 @@ export function createWater(seed = 777): Water {
       // 7 — the waterline. Without a busy seam the reflection simply starts, and
       //     a reflection that starts at a ruled line looks like a screenshot
       //     pasted upside down.
+      //
+      //     A stepped EDGE, two pixels deep, not a one-pixel sine. The seam was
+      //     a single row of lit dots following one sine, which at this scale is
+      //     a dotted rule — and a dotted rule is exactly the ruled line it was
+      //     put there to break up. Two detuned sines quantised to whole pixels
+      //     give the bank a ragged lip instead, in the same stepped vocabulary
+      //     as the roofs, the arch ring and the barge's reflection.
       g.save();
-      g.globalAlpha = 0.5;
       g.fillStyle = v.lift;
       for (let x = 0; x < w; x++) {
-        const n = Math.abs(Math.sin(x * 0.35 + t / 3));
-        if (n > 0.56) g.fillRect(x, top + (n > 0.72 ? 1 : 0), 1 + Math.round(n), 1);
+        const n = Math.sin(x * 0.35 + t / 3) * 0.6 + Math.sin(x * 0.11 - t / 5) * 0.4;
+        // Quantised to 0, 1 or 2 — the whole point is that the edge STEPS.
+        const rise = Math.round(Math.abs(n) * 2);
+        if (rise === 0) continue;
+        g.globalAlpha = 0.42;
+        g.fillRect(x, top, 1, rise);
+        // The lit crest sits on top of the step it belongs to, so the two never
+        // separate into a line of dots floating above a line of edge.
+        g.globalAlpha = 0.62;
+        g.fillRect(x, top + rise - 1, 1, 1);
       }
       g.restore();
     },
