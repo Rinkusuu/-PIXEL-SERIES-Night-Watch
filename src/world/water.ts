@@ -1,6 +1,7 @@
 import type { AmbientValues } from '../ambient/types';
 import type { Horizon } from './horizon';
 import { stream } from './rng';
+import { piers } from './bridge';
 
 /**
  * How hard the world above is compressed as it comes back up out of the water.
@@ -16,6 +17,9 @@ export const REFLECT_STEP = [3, 4, 6] as const;
 export const RIPPLE_SCALE = [1, 0.6, 0.35] as const;
 
 export const RING_LIMIT = 32;
+
+/** How many rows the wash off a cutwater runs for before it dies. */
+const WASH_LEN = 9;
 
 export type Ring = { x: number; y: number; r: number; life: number; max: number };
 
@@ -233,6 +237,37 @@ export function createWater(seed = 777): Water {
       //     and it is why the river reads as a surface rather than a photograph
       //     dropped into a drawing.
 
+      g.restore();
+
+      // 6b — the wash off the piers. A pier standing in a moving river throws a
+      //      V downstream from its cutwater, and without one the piers read as
+      //      posts set into a painted surface rather than as stone the current
+      //      is running past. It is the cheapest thing in the scene that says
+      //      the river MOVES.
+      //
+      //      Drawn here rather than in `bridge.ts` because everything from
+      //      `waterTop` down belongs to this module and is repainted opaquely
+      //      over the plate every frame — a V drawn on the plate would be
+      //      washed out before anybody saw it. Positions come from `piers()`,
+      //      not from a second guess about where the piers are.
+      //
+      //      Static in shape and frozen with `motion`: the river already has
+      //      its budget of moving things, and a V that animates competes with
+      //      the rings for the same attention while saying less.
+      g.save();
+      g.fillStyle = v.lift;
+      for (const q of piers(w, hz)) {
+        const cx = Math.round(q.x + q.w / 2);
+        for (let k = 1; k <= WASH_LEN; k++) {
+          // One step out for every step down: a wake angle, not a splash.
+          const dx = Math.round(k * 1.7);
+          const y = top + k;
+          if (y >= bot) break;
+          g.globalAlpha = 0.34 * (1 - k / WASH_LEN);
+          g.fillRect(cx - dx, y, 2, 1);
+          g.fillRect(cx + dx - 1, y, 2, 1);
+        }
+      }
       g.restore();
 
       // 7 — the waterline. Without a busy seam the reflection simply starts, and

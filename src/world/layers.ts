@@ -141,6 +141,7 @@ export function drawStatic(
   drawBridge(g, w, hz, {
     fill: ladder.bridge,
     ink,
+    ...facets(ladder.bridge, v, 1),
     density: 0.52,
     // What you see through an arch is the far bank, further away than the stone
     // around it — so both stops come from the ladder, like every other depth,

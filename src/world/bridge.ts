@@ -57,9 +57,22 @@ export function piers(w: number, hz: Horizon): Pier[] {
   return out;
 }
 
+/**
+ * How far a pedestrian refuge lifts the parapet over its pier.
+ *
+ * Exported because the gas standard stands ON the refuge, and `bloom.ts` puts
+ * the flame above the standard. Three modules, one number — rule A, and the
+ * fourth time this file has had to export a line for it.
+ */
+export const REFUGE_H = 4;
+
 export type BridgeStyle = {
   fill: string;
   ink: string;
+  /** One rung lighter: coping, alternate voussoirs, the refuge's cap. */
+  lit: string;
+  /** One rung darker: the parapet's panels and the roadway's base course. */
+  shade: string;
   density: number;
   /** Haze seen THROUGH an arch, at the crown. */
   hazeTop: string;
@@ -145,17 +158,29 @@ export function drawBridge(
   g.fill();
   g.restore();
 
-  // 2 — the roadway, one solid band with the arch voids punched back out.
+  // 2 — the roadway, one solid band with the arch voids punched back out, and
+  //     the pedestrian refuges standing proud of it over each pier.
+  //
+  //     The refuges are the only thing in this module that changes the bridge's
+  //     SILHOUETTE, and a broken silhouette is most of what separates a
+  //     Victorian river crossing from a plank. Four pixels: past that the deck
+  //     goes from articulated to serrated.
   g.save();
   g.beginPath();
   g.rect(0, deckTop, w, hz.bridgeBot - deckTop);
+  for (const q of p) {
+    const cx = Math.round(q.x + q.w / 2);
+    const rw = Math.round(q.w * 1.6);
+    g.moveTo(cx - rw / 2, deckTop);
+    g.lineTo(cx - rw / 2, deckTop - REFUGE_H);
+    g.lineTo(cx + rw / 2, deckTop - REFUGE_H);
+    g.lineTo(cx + rw / 2, deckTop);
+    g.closePath();
+  }
   for (const sp of spans) archPath(g, sp.x0, sp.x1, crownY, hz.bridgeBot);
 
   g.fillStyle = s.fill;
   g.fill('evenodd');
-  g.save();
-  g.clip('evenodd');
-  g.restore();
   g.restore();
 
   // 3 — the intrados, the curve's inner edge. One pale line is what tells the
@@ -172,6 +197,60 @@ export function drawBridge(
     g.stroke();
   }
   g.restore();
+
+  // 3b — voussoirs: the ring of wedge stones the arch is actually built from.
+  //      Every arch had exactly one pale line on it, which says "hole" but
+  //      never says "built".
+  //
+  //      Sampled off `archCurve`, the same function the void, the punch-out and
+  //      the intrados already read — rule A, and this curve is not getting a
+  //      fourth definition of itself.
+  //
+  //      The count is forced ODD so there is a stone AT t = 0.5, on the crown.
+  //      The eye goes looking for a keystone on any arch it is shown, and an
+  //      even ring puts a joint where the keystone should be.
+  //
+  //      Alternating `fill` and `lit`, never `fill` and `ink`: at full contrast
+  //      the ring stops reading as masonry and starts reading as a cog.
+  for (const sp of spans) {
+    const { span, springY, controlY } = archCurve(sp.x0, sp.x1, crownY);
+    let n = Math.round(span / 7);
+    if (n % 2 === 0) n += 1;
+    n = Math.max(5, n);
+    const mid = sp.x0 + span / 2;
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1);
+      const u = 1 - t;
+      const px = u * u * sp.x0 + 2 * u * t * mid + t * t * sp.x1;
+      const py = u * u * springY + 2 * u * t * controlY + t * t * springY;
+
+      // Offset along the curve's NORMAL, not straight up. A ring laid out by
+      // dropping every stone upward works at the crown, where the curve is flat,
+      // and falls apart at the springings, where it is nearly vertical — the
+      // stones there ended up sitting beside the arch like bolts rather than
+      // around it. Tangent of a quadratic is 2(1-t)(C-P0) + 2t(P1-C); the normal
+      // is that turned a quarter, and it points out of the void on its own at
+      // every t.
+      const tx = 2 * u * (mid - sp.x0) + 2 * t * (sp.x1 - mid);
+      const ty = 2 * u * (controlY - springY) + 2 * t * (springY - controlY);
+      const len = Math.hypot(tx, ty) || 1;
+      const nx = ty / len;
+      const ny = -tx / len;
+
+      const keystone = i === (n - 1) / 2;
+      // Alternating `lit` and `shade`, never `lit` and `fill`. Half the ring
+      // used to be painted in the roadway's own value on top of the roadway,
+      // so every other stone was invisible and what survived read as a handful
+      // of studs rather than as an arch ring. Both values step off the stone;
+      // neither steps far, because a full-contrast ring is a cog wheel.
+      g.fillStyle = keystone ? s.lit : i % 2 === 0 ? s.lit : s.shade;
+      const vw = keystone ? 4 : 3;
+      const vh = keystone ? 5 : 4;
+      const cx = px + nx * (vh / 2);
+      const cy = py + ny * (vh / 2);
+      g.fillRect(Math.round(cx - vw / 2), Math.round(cy - vh / 2), vw, vh);
+    }
+  }
 
   // Cutwaters — the pointed noses that split the current. Cheap, and they are
   // the difference between piers and posts.
@@ -194,25 +273,57 @@ export function drawBridge(
   //
   // Two pixels wide, and no wider: at three this reads as a chimney, and a row
   // of chimneys along a bridge parapet is worse than a row of floating flames.
+  //
+  // Standing on the REFUGE, not on the roadway. The refuge lifts the parapet
+  // four pixels over every pier and the standards are over the piers, so a post
+  // measured from `deckTop` would start four pixels inside the stone it is
+  // supposed to be bolted to.
   g.fillStyle = s.ink;
   for (const q of p) {
     const lx = Math.round(q.x + q.w / 2);
-    g.fillRect(lx - 1, deckTop - LAMP_H, 2, LAMP_H);
+    const base = deckTop - REFUGE_H;
+    g.fillRect(lx - 1, base - LAMP_H, 2, LAMP_H);
     // The lantern housing the flame sits inside. 4x4 is the whole lamp at this
     // distance; larger and it becomes a pillar box on a stick.
-    g.fillRect(lx - 2, deckTop - LAMP_H - 4, 4, 4);
+    g.fillRect(lx - 2, base - LAMP_H - 4, 4, 4);
   }
 
-  // String course: two thin parallel lines along the roadway. Without them the
-  // deck is a slab.
-  g.strokeStyle = s.ink;
-  g.lineWidth = 1;
-  g.globalAlpha = 0.7;
-  for (const y of [deckTop + 2, deckTop + deckH - 2]) {
-    g.beginPath();
-    g.moveTo(0, y);
-    g.lineTo(w, y);
-    g.stroke();
+  // The parapet. It was two hairline strokes along a slab, and that was the
+  // entire content of the largest object in the middle distance.
+  //
+  // Coping, panels, base course — the three things every parapet has, as filled
+  // blocks rather than lines (rule C). The refuges get their own coping four
+  // pixels higher, or they read as blocks stuck on rather than as part of the
+  // same wall.
+  g.fillStyle = s.lit;
+  g.fillRect(0, deckTop, w, 1);
+  for (const q of p) {
+    const cx = Math.round(q.x + q.w / 2);
+    const rw = Math.round(q.w * 1.6);
+    g.fillRect(Math.round(cx - rw / 2), deckTop - REFUGE_H, rw, 1);
   }
-  g.globalAlpha = 1;
+
+  // Panels, pitched off the PIERS rather than off the frame. A pitch that does
+  // not divide the span leaves a half-panel against every pier, and a dozen
+  // half-panels all cut on the same side make the whole bridge read as leaning.
+  const panelTop = deckTop + 2;
+  const panelH = Math.max(2, deckH - 5);
+  g.fillStyle = s.shade;
+  for (const sp of spans) {
+    const span = sp.x1 - sp.x0;
+    const n = Math.max(2, Math.round(span / 26));
+    const pitch = span / n;
+    for (let i = 0; i < n; i++) {
+      // Inset each side, so what survives between two panels is a pilaster.
+      const px = sp.x0 + pitch * i + 3;
+      const pw = pitch - 6;
+      if (pw < 3) continue;
+      g.fillRect(Math.round(px), panelTop, Math.round(pw), panelH);
+    }
+  }
+
+  // The base course the whole roadway sits on, in shadow — the same plinth the
+  // city's flat blocks get, for the same reason.
+  g.fillStyle = s.shade;
+  g.fillRect(0, deckTop + deckH - 2, w, 2);
 }
