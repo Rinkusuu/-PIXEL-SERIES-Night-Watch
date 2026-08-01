@@ -31,6 +31,16 @@ export function archCrown(hz: Horizon): number {
   return hz.bridgeTop + roadwayDepth(hz);
 }
 
+/**
+ * Height of a gas standard on the bridge, from the parapet to the flame.
+ *
+ * `bloom.ts` puts its `bridge` lamp spots at `bridgeTop - LAMP_H`, and this
+ * module draws the post under them. One number, two readers — so it is exported
+ * rather than written twice. `lanternAnchor()` exists for exactly this reason on
+ * the near lantern; this is the same fact one depth further away.
+ */
+export const LAMP_H = 9;
+
 export function piers(w: number, hz: Horizon): Pier[] {
   const count = Math.max(2, Math.round(w / SPAN_TARGET) + 1);
   const step = w / (count - 1);
@@ -174,6 +184,23 @@ export function drawBridge(
     g.lineTo(q.x + q.w, noseY - q.w * 1.4);
     g.closePath();
     g.fill();
+  }
+
+  // Gas standards, one over each pier. `bloom.ts` has been putting a flame at
+  // `bridgeTop - LAMP_H` since the bridge was built and nothing was ever drawn
+  // underneath it — so a dozen lights hung nine pixels above the parapet with
+  // no object holding them up. It is the same fault that was fixed for the near
+  // lantern in `7b5296b`, recurring one layer further back.
+  //
+  // Two pixels wide, and no wider: at three this reads as a chimney, and a row
+  // of chimneys along a bridge parapet is worse than a row of floating flames.
+  g.fillStyle = s.ink;
+  for (const q of p) {
+    const lx = Math.round(q.x + q.w / 2);
+    g.fillRect(lx - 1, deckTop - LAMP_H, 2, LAMP_H);
+    // The lantern housing the flame sits inside. 4x4 is the whole lamp at this
+    // distance; larger and it becomes a pillar box on a stick.
+    g.fillRect(lx - 2, deckTop - LAMP_H - 4, 4, 4);
   }
 
   // String course: two thin parallel lines along the roadway. Without them the

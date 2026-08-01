@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   BARGE_CROSS_MS, BARGE_PERIOD_MS, BIRD_COUNT, bargeAt, birdAt, effectsFor, weatherFor,
 } from '../../src/world/weather';
+import { drawWeather } from '../../src/world/weather';
+import { horizon } from '../../src/world/horizon';
+import { skyline } from '../../src/world/city';
+import { resolve } from '../../src/ambient/interpolate';
+import { NIGHT_KEYS } from '../../src/ambient/keyframes';
+import { gradesFor } from '../../src/ambient/grade';
+import type { Water } from '../../src/world/water';
 
 describe('weatherFor', () => {
   it('gives the same night the same weather, always', () => {
@@ -100,5 +107,45 @@ describe('birdAt', () => {
       for (let t = 0; t < 40_000; t += 250) if (birdAt(t, i)) { seen = true; break; }
       expect(seen).toBe(true);
     }
+  });
+});
+
+describe('rain', () => {
+  const hz = horizon(900, Math.round(900 * 0.66));
+  const v = resolve(NIGHT_KEYS, 0.5, gradesFor(['calm']));
+  const blocks = skyline(1440, hz.cityTop, hz.cityBot, 11);
+  const water: Water = { ring: () => {}, update: () => {}, draw: () => {} } as unknown as Water;
+
+  /** Every y a stroke path starts at, over a spread of frames. */
+  function heads(): number[] {
+    const out: number[] = [];
+    const g = new Proxy({} as CanvasRenderingContext2D, {
+      get(_t, key) {
+        if (key === 'moveTo') return (_x: number, y: number) => out.push(y);
+        if (key === 'createLinearGradient' || key === 'createRadialGradient') {
+          return () => ({ addColorStop: () => {} });
+        }
+        return () => {};
+      },
+      set: () => true,
+    });
+    for (const t of [0, 137, 401, 909, 1600]) {
+      drawWeather(g, 1440, hz, v, 'rain', blocks, water, t, 1, 0);
+    }
+    return out;
+  }
+
+  it('falls all the way to the foot of the frame, not to the parapet', () => {
+    // It was modulo `hz.railBot`, so every drop wrapped back to the top the
+    // instant it reached the balustrade, and the deck the player stands on
+    // stayed dry through a rainy night — the ONE surface near enough to notice.
+    // A fifth of all nights are rainy.
+    const below = heads().filter((y) => y > hz.railBot);
+    expect(below.length).toBeGreaterThan(0);
+    expect(Math.max(...heads())).toBeGreaterThan(hz.deckTop);
+  });
+
+  it('still never starts a drop below the frame', () => {
+    expect(Math.max(...heads())).toBeLessThanOrEqual(hz.h);
   });
 });

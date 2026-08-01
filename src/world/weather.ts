@@ -2,6 +2,7 @@ import type { AmbientValues } from '../ambient/types';
 import type { Block } from './city';
 import type { Horizon } from './horizon';
 import type { Water } from './water';
+import { hexToRgb, mixRgb, rgbToHex } from '../ambient/interpolate';
 import { hashString, rand } from './rng';
 
 export type Weather = 'clear' | 'fog' | 'rain' | 'fullmoon';
@@ -110,8 +111,11 @@ export function drawWeather(
 
   // 1 — smoke, from factory stacks only.
   const stacks = blocks.filter((b) => b.kind === 'factory').slice(0, 4 - Math.min(notch, 2));
+  // Soot at the stack, fog's own colour once it has thinned into the sky.
+  // Mixed once per frame, not once per puff: forty puffs is forty hex parses.
+  const soot = hexToRgb(v.deep);
+  const spent = hexToRgb(v.accent);
   g.save();
-  g.fillStyle = v.accent;
   for (const [i, b] of stacks.entries()) {
     const puffs = 12 - notch * 3;
     for (let k = 0; k < puffs; k++) {
@@ -119,6 +123,15 @@ export function drawWeather(
       const rise = age * (hz.cityTop * 0.9 + 40);
       const lean = age * age * 34 + Math.sin(t * 0.4 + i) * 6 * motion;
       const radius = 3 + age * 16;
+      // Soot leaves the stack DARK and pales as it thins into the sky. The
+      // whole column used to be `v.accent`, the fog's own colour — so smoke
+      // came out of a dark chimney lighter than the chimney and the plume ran
+      // backwards. It is the same mistake as an arch void going dark at the
+      // bottom: a value moving the wrong way along its own depth.
+      //
+      // Ramped, not switched. A hard changeover partway up reads as two
+      // separate plumes stacked on each other, and the eye finds the seam.
+      g.fillStyle = rgbToHex(mixRgb(soot, spent, Math.min(1, age * 1.4)));
       g.globalAlpha = (1 - age) * 0.13;
       g.beginPath();
       g.arc(b.stackX! + lean, b.top - rise, radius, 0, Math.PI * 2);
@@ -188,7 +201,12 @@ export function drawWeather(
     for (let i = 0; i < density; i++) {
       const speed = 900 + rand(i) * 700;
       const x = ((rand(i + 3) * w + t * 90) % (w + 60)) - 30;
-      const y = (rand(i + 7) * hz.railBot + t * speed) % hz.railBot;
+      // Modulo the FRAME, not the balustrade. It was `hz.railBot`, so every
+      // drop wrapped back to the top the instant it reached the parapet and the
+      // deck the player is standing on stayed bone dry through a rainy night —
+      // the one surface close enough for anybody to notice. A fifth of all
+      // nights are rainy.
+      const y = (rand(i + 7) * hz.h + t * speed) % hz.h;
       g.moveTo(x, y);
       g.lineTo(x - 4, y + 13);
     }

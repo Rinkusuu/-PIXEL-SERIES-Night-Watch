@@ -4,7 +4,7 @@ import { openings } from './city';
 import type { Horizon } from './horizon';
 import type { LampSpot } from './water';
 import type { WeatherFx } from './weather';
-import { piers } from './bridge';
+import { LAMP_H, piers } from './bridge';
 import { lanternAnchor } from './foreground';
 import { rand } from './rng';
 
@@ -102,7 +102,10 @@ export function lampSpots(
   for (const [i, q] of p.entries()) {
     out.push({
       x: Math.round(q.x + q.w / 2),
-      y: hz.bridgeTop - 9,
+      // `LAMP_H` above the parapet, from bridge.ts — which is the module that
+      // draws the post this flame sits on. Two copies of the number is a flame
+      // floating beside its own lantern.
+      y: hz.bridgeTop - LAMP_H,
       r: 3,
       lit: i < Math.max(1, Math.round((n / TOTAL_LAMPS) * p.length)),
       kind: 'bridge',
