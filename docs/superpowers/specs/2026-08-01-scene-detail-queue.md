@@ -322,13 +322,14 @@ persis terbalik. Ini pelanggaran aturan B di tempat lain, dan sama dengan bug
 ─────────────────────────────────── di atas ini bug, di bawah ini detail
 8.1  berkas cahaya                   dampak tertinggi yang tersisa   SELESAI
 6.2  genangan                       DICORET — dek tertutup panel kaca
-5.1  pantulan tongkang
-4.2  4.3  4.5  parapet, voussoir, teluk
-4.4  riak cutwater
+5.1  pantulan tongkang                                               SELESAI
+4.2  4.3  4.5  parapet, voussoir, teluk                             SELESAI
+4.4  riak cutwater                                                   SELESAI
+8.2  gumpalan kabut                                                  SELESAI
+7.1  7.2  7.3  7.4  bingkai depan                                    SELESAI
+─────────────────────────────────── sisa, semua perlu diukur dulu
 6.3  6.4  6.5  sett, kerb, baluster, perabot
 5.2  5.3  5.4  tongkang, lalu lintas sungai, garis air
-8.2  gumpalan kabut
-7.1  7.2  7.3  7.4  bingkai depan
 ```
 
 Tiga cacat lebih dulu, karena memperbaiki yang rusak selalu lebih murah daripada
