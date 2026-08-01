@@ -22,6 +22,13 @@ export const LADDER_STOPS = {
   /** The band standing BEHIND the main skyline. Barely pulled from the fog at
    *  all — atmospheric perspective is what tells the eye it is further away. */
   cityFar: 0.24,
+  /**
+   * The band between. `cityFar` to `city` was a single 0.21 step with nothing
+   * in it, so the two bands read as two groups of stickers at two distances
+   * rather than as a city receding. Depth is not two planes; it is a series,
+   * and the eye needs at least three terms to read one.
+   */
+  cityMid: 0.34,
   city: 0.45,
   bridge: 0.70,
   deck: 0.88,
@@ -30,6 +37,7 @@ export const LADDER_STOPS = {
 
 export type Ladder = {
   cityFar: string;
+  cityMid: string;
   city: string;
   bridge: string;
   deck: string;
@@ -45,6 +53,7 @@ export function valueLadder(v: AmbientValues, wet = 0): Ladder {
 
   return {
     cityFar: at(LADDER_STOPS.cityFar),
+    cityMid: at(LADDER_STOPS.cityMid),
     city: at(LADDER_STOPS.city),
     bridge: at(LADDER_STOPS.bridge),
     deck: at(LADDER_STOPS.deck + wet * 0.25),

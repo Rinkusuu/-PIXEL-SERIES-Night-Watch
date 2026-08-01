@@ -85,8 +85,11 @@ export function setbackOf(
  * rare. Height now only decides whether we are down on the waterfront.
  */
 function pickKind(r: number, heightF: number): ShapeKind {
-  // The waterfront itself: sheds and cranes, and nothing tall.
-  if (heightF < 0.22) return r < 0.42 ? 'crane' : r < 0.78 ? 'gable' : 'flat';
+  // The waterfront itself: sheds and cranes, and nothing tall. Threshold cut
+  // from 0.22 to 0.10 when the height curve was inverted — at 0.22 a curve that
+  // leans low puts a THIRD of the city on the waterfront, and a skyline that is
+  // one third crane is a dockyard.
+  if (heightF < 0.10) return r < 0.42 ? 'crane' : r < 0.78 ? 'gable' : 'flat';
   if (r < 0.46) return 'flat';
   if (r < 0.68) return 'gable';
   if (r < 0.82) return 'factory';
@@ -100,6 +103,13 @@ function pickKind(r: number, heightF: number): ShapeKind {
  * half as wide. Out there, density IS the detail.
  */
 export const FAR_SCALE = 0.55;
+
+/**
+ * The same multiplier for the band in between. Between the far band's 0.55 and
+ * the near band's 1, and closer to the near one: this band is meant to read as
+ * a step in a series, not as a third unrelated city.
+ */
+export const MID_SCALE = 0.78;
 
 export function skyline(
   w: number, top: number, bot: number, seed: number, scale = 1,
@@ -119,7 +129,15 @@ export function skyline(
 
   while (x < w) {
     const bw = Math.max(minW, Math.round(minW + r() * (maxW - minW)));
-    const heightF = Math.pow(r(), 0.62);
+    // Exponent ABOVE one, so the curve leans low. It was 0.62, which leans
+    // high: the mean block filled 69% of the band and the bulk of them landed
+    // between 60% and 100%, so the roofline came out an even hedge and nothing
+    // in the city towered over anything else. A skyline is not made grand by
+    // being tall, it is made grand by the DIFFERENCE between its tall things
+    // and its ordinary ones — and if everything is tall there is no difference
+    // left to read. At 1.5 the mean block fills 40% and roughly one in seven
+    // clears 80%, which is the ratio a real skyline has.
+    const heightF = Math.pow(r(), 1.5);
     const roll = r();
 
     // Annotated: without it TS infers `kind` through `lastKind`, which is
@@ -145,7 +163,12 @@ export function skyline(
     // Guarantee the aspect ratio instead of hoping a random height clears it.
     // `floor`, not `round`: rounding down the top means rounding UP the height,
     // so the ratio can only ever land above the minimum, never a hair below it.
-    let blockTop = Math.round(bot - span * (0.18 + heightF * 0.82));
+    // Floor raised from 0.18 to 0.30. The upstream bridge's parapet stands at
+    // about a fifth of this band up from the waterline, so anything shorter
+    // than that is drawn entirely behind stone and seen by nobody. With the old
+    // height curve almost nothing landed that low; with this one a great deal
+    // would, and it would all be wasted ink.
+    let blockTop = Math.round(bot - span * (0.30 + heightF * 0.70));
     if (narrow) {
       blockTop = Math.min(blockTop, Math.floor(bot - width * MIN_SPIRE_ASPECT));
       if (blockTop < top) blockTop = top;
@@ -188,19 +211,59 @@ export type Opening = {
   x: number; y: number; w: number; h: number;
 };
 
-const WIN_W = 4;
-const WIN_H = 7;
-/** Floor to floor. Under about ten and the rows merge into a smear. */
-const STOREY = 11;
-const COL_PITCH = 9;
 const INSET = 5;
+
+/**
+ * The window grid of a mass, as a function of how big that mass is.
+ *
+ * These used to be five flat constants, so a ninety-pixel warehouse and an
+ * eighteen-pixel shed carried windows of exactly the same size at exactly the
+ * same spacing. That is the single strongest reason the city read as small.
+ *
+ * The eye does not judge a building's size from how much of the frame it takes
+ * up — it has nothing to compare that against. It judges size from how FINELY
+ * the thing is subdivided, because window and storey are the units it already
+ * knows the real-world measurement of. A cathedral reads as vast because it is
+ * made of hundreds of small parts. Give a big mass the same four-by-seven
+ * windows as the shed beside it and the eye sizes it like the shed, however
+ * wide it is drawn.
+ *
+ * So: bigger mass, MORE and SMALLER openings. Not the same openings spread
+ * further apart, which is the intuitive move and the wrong one — it reads as a
+ * shed built by someone who ran out of windows.
+ *
+ * `t` runs 0 for a low block to 1 for a tall one. Everything below has a floor,
+ * because past a point a window stops being a window and becomes grain: at
+ * three by five it is still an opening, at two by three it is dirt on the
+ * plate.
+ */
+function metrics(bh: number): {
+  winW: number; winH: number; storey: number; pitch: number;
+} {
+  const t = Math.min(1, Math.max(0, (bh - 55) / 110));
+  return {
+    winW: t > 0.55 ? 3 : 4,
+    winH: Math.round(7 - t * 2),
+    // Floor to floor. Under about eight and the rows merge into a smear.
+    storey: Math.round(11 - t * 3),
+    pitch: Math.round(9 - t * 2),
+  };
+}
 
 /**
  * Fills a slab with a window grid, centred horizontally and clamped hard. A
  * block too small for one whole row gets nothing at all — a clipped row reads
  * as damage, not as a window.
+ *
+ * `m` comes from the whole block, never from this slab: a stepped tower's upper
+ * mass and lower mass are ONE building and must be glazed on one module. Sized
+ * per slab, the storeys visibly change height at the shoulder.
  */
-function grid(x0: number, y0: number, x1: number, y1: number): Opening[] {
+function grid(
+  x0: number, y0: number, x1: number, y1: number,
+  m: ReturnType<typeof metrics>,
+): Opening[] {
+  const { winW: WIN_W, winH: WIN_H, storey: STOREY, pitch: COL_PITCH } = m;
   const out: Opening[] = [];
   const innerW = x1 - x0 - INSET * 2;
   const cols = Math.floor((innerW + (COL_PITCH - WIN_W)) / COL_PITCH);
@@ -228,24 +291,27 @@ function grid(x0: number, y0: number, x1: number, y1: number): Opening[] {
 export function openings(b: Block, bot: number): Opening[] {
   const { x, w, top, kind } = b;
   const bh = bot - top;
+  // Sized once, from the block as a whole. Every slab of this block is glazed
+  // on the same module — see `grid`.
+  const m = metrics(bh);
 
   switch (kind) {
     case 'flat': {
       // Follows the setback from the SAME source the massing uses. Two copies
       // of this geometry and the upper storeys hang off the shoulder in mid-air.
       const sb = setbackOf(b, bot);
-      if (!sb) return grid(x, top, x + w, bot);
-      return grid(x + sb.inset, top, x + w - sb.inset, sb.shoulder)
-        .concat(grid(x, sb.shoulder, x + w, bot));
+      if (!sb) return grid(x, top, x + w, bot, m);
+      return grid(x + sb.inset, top, x + w - sb.inset, sb.shoulder, m)
+        .concat(grid(x, sb.shoulder, x + w, bot, m));
     }
 
     case 'gable':
       // Starts at the eaves the massing draws its roof from.
-      return grid(x, top + bh * 0.34, x + w, bot);
+      return grid(x, top + bh * 0.34, x + w, bot, m);
 
     case 'factory':
       // The stack stays blind. Only the shed body is glazed.
-      return grid(x, top + bh * 0.62, x + w, bot);
+      return grid(x, top + bh * 0.62, x + w, bot, m);
 
     case 'dome': {
       // One arcade ring around the drum, and a grid on the block below it. A
@@ -262,7 +328,7 @@ export function openings(b: Block, bot: number): Opening[] {
         if (ox < x || ox + 3 > x + w || ringY + 8 > bot) continue;
         out.push({ kind: 'window', x: ox, y: ringY, w: 3, h: 8 });
       }
-      return out.concat(grid(x, shoulder, x + w, bot));
+      return out.concat(grid(x, shoulder, x + w, bot, m));
     }
 
     case 'spire': {

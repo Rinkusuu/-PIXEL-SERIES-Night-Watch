@@ -72,7 +72,13 @@ export function horizon(h: number, deckTopPx: number): Horizon {
 
   return {
     h,
-    cityTop: Math.round(above * 0.40),
+    // Headroom for the tallest towers, not the height of the average roof.
+    // It was 0.40, and with a height curve that pushed every block toward the
+    // top of its band that WAS the roofline — a hedge with nothing rising out
+    // of it. The curve now leaves most blocks low (see `skyline`), so this line
+    // is reached by a handful of towers and the rest of the band sits well
+    // under it. Grandeur is the gap between the two, and the gap needs room.
+    cityTop: Math.round(above * 0.30),
     skyBot: Math.round(above * 0.55),
     cityBot: waterTop,
     // Close to the waterline on purpose. A distant bridge is a THIN band; give

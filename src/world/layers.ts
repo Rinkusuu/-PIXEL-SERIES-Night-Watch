@@ -2,7 +2,7 @@ import type { AmbientValues } from '../ambient/types';
 import { hexToRgb, mixRgb, rgbToHex } from '../ambient/interpolate';
 import type { Block } from './city';
 import type { Horizon } from './horizon';
-import { FAR_SCALE, drawSkyline, skyline } from './city';
+import { FAR_SCALE, MID_SCALE, drawSkyline, skyline } from './city';
 import { drawBridge } from './bridge';
 import { drawDeck } from './deck';
 import { valueLadder } from './ladder';
@@ -93,6 +93,20 @@ export function drawStatic(
     ...facets(ladder.cityFar, v, 0.5),
     density: 0.18,
     openings: false,
+    details: false,
+  });
+
+  // 2b — the band BETWEEN. Its own seed again, so its towers land in neither
+  //      of the other two bands' gaps by accident. Openings yes, details no: at
+  //      0.78 a window is still a window, but a crocket is four pixels and at
+  //      that scale a band of them reads as grit.
+  const mid = skyline(w, hz.cityTop, hz.cityBot, Math.round(w * 23 + hz.h), MID_SCALE);
+  drawSkyline(g, mid, hz.cityBot, {
+    fill: ladder.cityMid,
+    ink,
+    ...facets(ladder.cityMid, v, 0.75),
+    density: 0.26,
+    openings: true,
     details: false,
   });
 
