@@ -1,4 +1,5 @@
 import type { Horizon } from './horizon';
+import { stream } from './rng';
 
 /**
  * The near vignette — the thing the scene was missing.
@@ -34,18 +35,40 @@ export function lanternAnchor(w: number, hz: Horizon): { x: number; y: number } 
   };
 }
 
+/**
+ * The nearest and hardest object in the picture, and until now a rectangle with
+ * a ball on it.
+ *
+ * Everything in this module is painted in one flat `VIGNETTE_INK` and must stay
+ * that way — it is the value anchor for the whole frame (`ladder.ts`). So none
+ * of the detail below is a second value, a panel or a highlight; every piece of
+ * it is a step in the OUTLINE. At this layer the silhouette is the only channel
+ * there is, and a shape carries as much information as you cut into its edge.
+ */
 function gatePier(g: CanvasRenderingContext2D, cx: number, hz: Horizon): void {
   const pw = 26;
   const x = cx - pw / 2;
   // Shaft, from the bottom of the frame to well above the parapet. A pier only
   // as tall as the railing disappears into the railing.
   g.fillRect(x, hz.waterTop, pw, hz.h - hz.waterTop);
-  // Plinth, wider at the foot.
+
+  // Plinth, in two courses. One course is a thicker bottom; two is a base the
+  // pier stands ON, and the difference is entirely in the extra step.
   g.fillRect(x - 5, hz.railBot, pw + 10, hz.deckTop - hz.railBot + 6);
-  // Cornice and ball cap.
-  g.fillRect(x - 4, hz.waterTop + 8, pw + 8, 7);
+  g.fillRect(x - 9, hz.railBot + 5, pw + 18, 5);
+
+  // Cornice, also in two courses: a deep bed and a thinner fillet standing on
+  // it. A single slab reads as a lid.
+  g.fillRect(x - 4, hz.waterTop + 10, pw + 8, 7);
+  g.fillRect(x - 7, hz.waterTop + 15, pw + 14, 4);
+
+  // Necking — the narrow drum the ball sits on. Without it the ball grows
+  // straight out of the cornice and the cap reads as a lump rather than as a
+  // separate piece of stone.
+  g.fillRect(cx - 6, hz.waterTop + 4, 12, 7);
+
   g.beginPath();
-  g.arc(cx, hz.waterTop + 2, 9, 0, Math.PI * 2);
+  g.arc(cx, hz.waterTop, 9, 0, Math.PI * 2);
   g.fill();
 }
 
@@ -69,7 +92,14 @@ function gateLeaf(
     g.closePath();
     g.fill();
   }
-  g.fillRect(fromX + Math.min(0, dir * bars * pitch), top + 6, bars * pitch, 3);
+  // Two rails, not one. A wrought gate is always framed top AND bottom — the
+  // bars are threaded through both, and with only the upper one the leaf reads
+  // as a row of loose spears leaning on a pier rather than as one object. The
+  // lower rail sits well up from the foot, where a gate's actually is.
+  const railX = fromX + Math.min(0, dir * bars * pitch);
+  const railW = bars * pitch;
+  g.fillRect(railX, top + 6, railW, 3);
+  g.fillRect(railX, bot - 14, railW, 3);
 }
 
 function gasStandard(g: CanvasRenderingContext2D, w: number, hz: Horizon): void {
@@ -88,6 +118,20 @@ function gasStandard(g: CanvasRenderingContext2D, w: number, hz: Horizon): void 
   // Base: stepped plinth.
   g.fillRect(cx - SHAFT_W * 1.9, hz.deckTop - 14, SHAFT_W * 3.8, 14);
   g.fillRect(cx - SHAFT_W * 2.4, hz.deckTop - 5, SHAFT_W * 4.8, 9);
+
+  // The lamplighter's ladder rest: a crossbar through the shaft, projecting
+  // both sides, a little below the crown. It is the one piece of a gas standard
+  // that exists purely because a person has to climb it every evening and every
+  // morning, and that is exactly why it belongs — the rest of this object could
+  // have been cast for decoration, but nobody bolts a rest bar to an ornament.
+  const restY = top + 30;
+  g.fillRect(cx - SHAFT_W * 1.7, restY, SHAFT_W * 3.4, 3);
+  // Two short stops turned up at the ends, so a ladder set against it cannot
+  // slide off sideways. Three pixels each, and they are what stop the bar
+  // reading as a stray horizontal line across the shaft.
+  for (const s of [-1, 1]) {
+    g.fillRect(cx + s * SHAFT_W * 1.7 - (s > 0 ? 3 : 0), restY - 4, 3, 5);
+  }
 
   // Acanthus crown — leaves curling outward under the arm.
   const crownY = top + 16;
@@ -140,28 +184,52 @@ function railFinials(g: CanvasRenderingContext2D, w: number, hz: Horizon): void 
   }
 }
 
+/**
+ * Overhanging branches at the two top corners.
+ *
+ * Every number here used to be fixed: three limbs at 4, 30 and 56, reaching
+ * 130, 96 and 62, with two twigs on each at t = 0.4 and t = 0.72 — the same on
+ * the left as on the right, every night, at every size. Two mirrored copies of
+ * one diagram is what the eye actually notices, because a tree is the one thing
+ * in the picture it has a lifetime of experience being irregular.
+ *
+ * Seeded from the frame rather than from `nightKey()` on purpose. These are the
+ * shape of the place you stand in, not the weather: the same window should show
+ * the same tree all week, and a resize is already allowed to reshape the
+ * skyline for the same reason.
+ */
 function branches(g: CanvasRenderingContext2D, w: number, hz: Horizon): void {
+  const r = stream(Math.round(w * 41 + hz.h));
   g.lineWidth = 2;
   for (const side of [0, 1]) {
     const rootX = side === 0 ? -6 : w + 6;
     const dir = side === 0 ? 1 : -1;
-    for (let b = 0; b < 3; b++) {
-      const dropY = 4 + b * 26;
-      const reach = 130 - b * 34;
+    const limbs = 3 + Math.floor(r() * 2);
+    for (let b = 0; b < limbs; b++) {
+      const dropY = 4 + b * 26 + Math.round(r() * 18);
+      const reach = 130 - b * 34 + Math.round(r() * 46);
+      // Droop varies per limb too: limbs that all bend on one curve read as a
+      // rake, and the twigs inherit it so a twig never leaves its own branch.
+      const droop = hz.cityTop * (0.42 + r() * 0.3);
       g.beginPath();
       g.moveTo(rootX, dropY);
       g.quadraticCurveTo(
-        rootX + dir * reach * 0.5, dropY + hz.cityTop * 0.22,
-        rootX + dir * reach, dropY + hz.cityTop * 0.55,
+        rootX + dir * reach * 0.5, dropY + droop * 0.4,
+        rootX + dir * reach, dropY + droop,
       );
       g.stroke();
-      // Two twigs off each limb.
-      for (const t of [0.4, 0.72]) {
+      for (let k = 0; k < 2 + Math.floor(r() * 2); k++) {
+        const t = 0.3 + r() * 0.55;
         const tx = rootX + dir * reach * t;
-        const ty = dropY + hz.cityTop * 0.55 * t * t;
+        const ty = dropY + droop * t * t;
+        const len = 11 + r() * 12;
         g.beginPath();
         g.moveTo(tx, ty);
-        g.lineTo(tx + dir * 16, ty - 13);
+        // Twigs go UP off the limb, always. A branch hanging into frame from
+        // above is being pulled down by its own weight; its twigs are the part
+        // that has not been pulled down yet, and one drawn downward reads as a
+        // break rather than as growth.
+        g.lineTo(tx + dir * len, ty - len * (0.6 + r() * 0.6));
         g.stroke();
       }
     }
