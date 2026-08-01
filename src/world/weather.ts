@@ -1,7 +1,7 @@
 import type { AmbientValues } from '../ambient/types';
 import type { Block } from './city';
 import type { Horizon } from './horizon';
-import type { Water } from './water';
+import { SQUASH, type Water } from './water';
 import { hexToRgb, mixRgb, rgbToHex } from '../ambient/interpolate';
 import { hashString, rand } from './rng';
 
@@ -56,6 +56,12 @@ export function effectsFor(w: Weather): WeatherFx {
       return { fogScale: 1, haloScale: 1, lumLift: 0, moonScale: 1, rain: 0, birds: true };
   }
 }
+
+/**
+ * How many bands the barge's reflection is cut into. Few enough that each one
+ * is a readable step, many enough that the column does not read as a staircase.
+ */
+const REFLECT_SLICES = 6;
 
 export const BARGE_PERIOD_MS = 15 * 60_000;
 export const BARGE_CROSS_MS = 90_000;
@@ -148,20 +154,81 @@ export function drawWeather(
     const y = hz.waterTop + (hz.waterBot - hz.waterTop) * 0.42;
     const bw = Math.max(70, w * 0.09);
     const bh = Math.max(9, bw * 0.14);
+    // The line the hull floats ON, and so the line it mirrors about.
+    const wl = y + bh;
+    const mastW = bw * 0.06;
+    const mastH = bh * 1.5;
+    const lampX = x + bw * 0.9;
+
+    // Hull and mast as one path, written once and traced twice — once upright,
+    // once inside the mirror transform. Two copies of this outline is two
+    // chances for the reflection to stop matching the thing casting it.
+    const body = () => {
+      g.beginPath();
+      g.moveTo(x, y);
+      g.lineTo(x + bw, y);
+      g.lineTo(x + bw * 0.88, y + bh);
+      g.lineTo(x + bw * 0.08, y + bh);
+      g.closePath();
+      g.fill();
+      g.fillRect(x + bw * 0.62, y - mastH, mastW, mastH);
+    };
+
+    // The reflection, FIRST, so the hull sits on top of its own image.
+    //
+    // `drawWeather` runs after `water.draw`, so the barge is painted onto a
+    // finished river — which made the one moving thing on the water the one
+    // thing with no shadow under it. Every static thing in the picture has been
+    // reflected since the scene was built; the eye reads the omission long
+    // before it can say what is missing.
+    //
+    // Cut into horizontal slices, each shifted a little further than the last,
+    // instead of drawn as one flipped copy. A rigid mirror image reads as a
+    // second barge hanging upside down; what makes it read as water is that the
+    // image DISAGREES with itself down its own length. The slices are also the
+    // same stepped vocabulary the dithered river and the stepped roofs use, so
+    // it costs nothing in style to do it this way.
+    g.save();
+    g.globalAlpha = 0.26;
+    g.fillStyle = v.deep;
+    for (let s = 0; s < REFLECT_SLICES; s++) {
+      const t = s / REFLECT_SLICES;
+      // Squashed by the same constant the river reflects the whole world by,
+      // so the barge foreshortens on the same curve as the city behind it.
+      const y0 = wl + (bh + mastH) * SQUASH * t;
+      const y1 = wl + (bh + mastH) * SQUASH * (t + 1 / REFLECT_SLICES);
+      // Sway grows with depth down the reflection and dies with `motion`:
+      // frozen means frozen, not gone. Deeper slices are older water.
+      const sway = Math.sin(timeMs / 700 + s * 1.3) * (1 + t * 3) * motion;
+
+      g.save();
+      g.beginPath();
+      g.rect(x - bw, y0, bw * 3, y1 - y0);
+      g.clip();
+      g.translate(sway, wl);
+      g.scale(1, -SQUASH);
+      g.translate(0, -wl);
+      body();
+      g.restore();
+    }
+    g.restore();
+
     g.save();
     g.fillStyle = v.deep;
-    g.beginPath();
-    g.moveTo(x, y);
-    g.lineTo(x + bw, y);
-    g.lineTo(x + bw * 0.88, y + bh);
-    g.lineTo(x + bw * 0.08, y + bh);
-    g.closePath();
-    g.fill();
-    g.fillRect(x + bw * 0.62, y - bh * 1.5, bw * 0.06, bh * 1.5);
+    body();
     g.globalCompositeOperation = 'lighter';
     g.globalAlpha = 0.8;
     g.fillStyle = v.glow;
-    g.fillRect(x + bw * 0.9, y - 3, 3, 3);
+    g.fillRect(lampX, y - 3, 3, 3);
+    // …and the bow light's own column in the water under it. A lamp above a
+    // river always drops one, and this is the only lamp in the picture that
+    // moves — so it is the only one whose column the eye can catch changing.
+    const col = g.createLinearGradient(0, wl, 0, wl + bh * 4);
+    col.addColorStop(0, v.glow);
+    col.addColorStop(1, 'transparent');
+    g.globalAlpha = 0.42;
+    g.fillStyle = col;
+    g.fillRect(lampX + Math.sin(timeMs / 700) * motion, wl, 3, bh * 4);
     g.restore();
     if (Math.floor(timeMs / 400) !== Math.floor((timeMs - 16) / 400)) {
       water.ring(x + bw, y + bh, 0.7);
