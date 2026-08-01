@@ -85,7 +85,7 @@ describe('gothic verticality', () => {
 
 describe('every shape carries its own detail', () => {
   const style = {
-    angle: -0.42, fill: '#222', ink: '#000', density: 0.34,
+    angle: -0.42, fill: '#222', ink: '#000', lit: '#333', shade: '#111', density: 0.34,
     openings: false, details: true,
   };
 
@@ -94,14 +94,16 @@ describe('every shape carries its own detail', () => {
    * a one-pixel line is what stopped this reading as pixel art, so every
    * detail is a filled rect and these are fillRect counts.
    */
+  // Every kind also carries ONE shadow-side band, painted clipped to the
+  // silhouette before the details — it is in each count below.
   const DETAIL_BLOCKS: Record<ShapeKind, number> = {
-    flat: 6,        // three pots + tank + tank lid + cornice
-    gable: 3,       // dormer face, its ridge, its window
-    spire: 2,       // finial shaft and collar
-    dome: 4,        // lantern, its lid, its spike, springing band
-    clockTower: 3,  // cornice band + two hands
-    factory: 3,     // two iron bands + capping ring
-    crane: 9,       // mast + seven jib segments + hook
+    flat: 9,        // shade + three pots + two courses, each a band and a lip + plinth
+    gable: 8,       // shade + three shingle courses + dormer face, lid, window + eaves
+    spire: 9,       // shade + six crockets + cross shaft and arm
+    dome: 10,       // shade + lantern, lid, spike + four ribs + band and its lip
+    clockTower: 9,  // shade + stage band and lip + four merlons + two hands
+    factory: 7,     // shade + two iron bands + cap + eaves band and lip + plinth
+    crane: 10,      // shade + mast + seven jib segments + hook
     gap: 0,         // nothing stands here; the slot is sky
   };
 

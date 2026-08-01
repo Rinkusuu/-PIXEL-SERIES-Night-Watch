@@ -27,6 +27,9 @@ export type Block = {
   stackX?: number;
 };
 
+/** Depth of the lit rim along every top edge. One pixel is a hairline at 2x. */
+const RIM = 2;
+
 const MIN_W = 18;
 const MAX_W = 90;
 
@@ -310,13 +313,30 @@ export function openings(b: Block, bot: number): Opening[] {
 }
 
 /**
+ * Eaves line of a gable and springing line of a spire's point. Read by BOTH the
+ * massing and the shingle courses drawn over it — one source, same rule as
+ * `setbackOf`.
+ */
+export function eaveOf(b: Block, bot: number): number {
+  const bh = bot - b.top;
+  return Math.round(b.top + bh * (b.kind === 'spire' ? 0.55 : 0.34));
+}
+
+/**
  * Massing only. Details (pots, jibs) are stroked separately after hatching.
+ *
+ * Every coordinate is rounded to a whole pixel. A path corner at x.5 is
+ * antialiased into a two-pixel ramp, and the buffer is blown up to the device
+ * with nearest neighbour — so one soft edge becomes a two-device-pixel smear
+ * and the whole band stops reading as pixel art. This is the cheapest half of
+ * the pixel look; the value steps are the other half.
  *
  * The block's own height is `bh`, never `h`: `h` is reserved for the frame, and
  * the smoke test in tests/smoke.test.ts refuses any `h * 0.x` outside horizon.ts.
  */
 function massing(g: CanvasRenderingContext2D, b: Block, bot: number): void {
-  const { x, w, top, kind } = b;
+  const { w, top, kind } = b;
+  const x = Math.round(b.x);
   const bh = bot - top;
   g.beginPath();
   switch (kind) {
@@ -324,23 +344,27 @@ function massing(g: CanvasRenderingContext2D, b: Block, bot: number): void {
       // Nothing. The slot exists so the cursor's arithmetic still covers the
       // width; what stands in it is sky.
       break;
-    case 'gable':
-      g.moveTo(x, bot); g.lineTo(x, top + bh * 0.34);
-      g.lineTo(x + w / 2, top); g.lineTo(x + w, top + bh * 0.34);
+    case 'gable': {
+      const eave = eaveOf(b, bot);
+      g.moveTo(x, bot); g.lineTo(x, eave);
+      g.lineTo(x + Math.round(w / 2), top); g.lineTo(x + w, eave);
       g.lineTo(x + w, bot); g.closePath();
       break;
-    case 'spire':
-      g.moveTo(x, bot); g.lineTo(x, top + bh * 0.55);
-      g.lineTo(x + w * 0.5, top); g.lineTo(x + w, top + bh * 0.55);
+    }
+    case 'spire': {
+      const eave = eaveOf(b, bot);
+      g.moveTo(x, bot); g.lineTo(x, eave);
+      g.lineTo(x + Math.round(w * 0.5), top); g.lineTo(x + w, eave);
       g.lineTo(x + w, bot); g.closePath();
       break;
+    }
     case 'dome': {
       // A dome on a drum on a block — not a bubble the width of the plot. At
       // `w * 0.5` every dome swallowed its own building and the skyline filled
       // up with half-circles.
-      const cx = x + w / 2;
-      const dr = Math.min(w * 0.34, 26);
-      const shoulder = top + dr * 2.1;
+      const cx = Math.round(x + w / 2);
+      const dr = Math.round(Math.min(w * 0.34, 26));
+      const shoulder = Math.round(top + dr * 2.1);
       g.moveTo(x, bot);
       g.lineTo(x, shoulder);
       g.lineTo(cx - dr, shoulder);
@@ -354,26 +378,27 @@ function massing(g: CanvasRenderingContext2D, b: Block, bot: number): void {
     }
     case 'clockTower': {
       const sw = Math.min(w, 30);
-      const sx = x + (w - sw) / 2;
-      g.moveTo(sx, bot); g.lineTo(sx, top + sw * 0.9);
-      g.lineTo(sx + sw / 2, top); g.lineTo(sx + sw, top + sw * 0.9);
+      const sx = Math.round(x + (w - sw) / 2);
+      const stage = Math.round(top + sw * 0.9);
+      g.moveTo(sx, bot); g.lineTo(sx, stage);
+      g.lineTo(sx + Math.round(sw / 2), top); g.lineTo(sx + sw, stage);
       g.lineTo(sx + sw, bot); g.closePath();
       break;
     }
     case 'factory': {
-      const sw = Math.max(5, w * 0.18);
-      const sx = x + w * 0.5 - sw / 2;
-      const shoulder = top + bh * 0.62;
+      const sw = Math.max(5, Math.round(w * 0.18));
+      const sx = Math.round(x + w * 0.5 - sw / 2);
+      const shoulder = Math.round(top + bh * 0.62);
       g.moveTo(x, bot); g.lineTo(x, shoulder);
-      g.lineTo(sx, shoulder); g.lineTo(sx + sw * 0.15, top);
-      g.lineTo(sx + sw * 0.85, top); g.lineTo(sx + sw, shoulder);
+      g.lineTo(sx, shoulder); g.lineTo(sx + Math.round(sw * 0.15), top);
+      g.lineTo(sx + Math.round(sw * 0.85), top); g.lineTo(sx + sw, shoulder);
       g.lineTo(x + w, shoulder); g.lineTo(x + w, bot); g.closePath();
       break;
     }
     case 'crane':
       // A low shed; the jib is stroked on top, because a filled jib at this size
       // turns into a blob.
-      g.rect(x, top + bh * 0.55, w, bh * 0.45);
+      g.rect(x, Math.round(top + bh * 0.55), w, Math.round(bh * 0.45));
       break;
     case 'flat':
     default: {
@@ -387,16 +412,18 @@ function massing(g: CanvasRenderingContext2D, b: Block, bot: number): void {
       const sb = setbackOf(b, bot);
       const ux = sb ? x + sb.inset : x;
       const uw = sb ? w - sb.inset * 2 : w;
+      const pl = Math.round(uw * 0.14);
+      const pr = Math.round(uw * 0.86);
       g.moveTo(x, bot);
       if (sb) {
         g.lineTo(x, sb.shoulder);
         g.lineTo(ux, sb.shoulder);
       }
       g.lineTo(ux, top + 5);
-      g.lineTo(ux + uw * 0.14, top + 5);
-      g.lineTo(ux + uw * 0.14, top);
-      g.lineTo(ux + uw * 0.86, top);
-      g.lineTo(ux + uw * 0.86, top + 5);
+      g.lineTo(ux + pl, top + 5);
+      g.lineTo(ux + pl, top);
+      g.lineTo(ux + pr, top);
+      g.lineTo(ux + pr, top + 5);
       g.lineTo(ux + uw, top + 5);
       if (sb) {
         g.lineTo(ux + uw, sb.shoulder);
@@ -412,6 +439,20 @@ function massing(g: CanvasRenderingContext2D, b: Block, bot: number): void {
 export type SkylineStyle = {
   fill: string;
   ink: string;
+  /**
+   * One rung LIGHTER than `fill`, for the two-pixel rim along every top edge,
+   * cornice caps and window sills. A silhouette painted in one flat value is a
+   * cut-out; what makes pixel art read as built stone is that every horizontal
+   * edge catches a little of the sky above it.
+   */
+  lit: string;
+  /**
+   * One rung DARKER, for the shadow side. The moon sits right of frame, so the
+   * shadow is always on a block's LEFT. One convention for the whole band —
+   * lighting each block from its own centre is what makes a skyline read as
+   * stickers.
+   */
+  shade: string;
   density: number;
   /** False for the far band: at twelve pixels wide an opening is a smudge. */
   openings: boolean;
@@ -430,15 +471,35 @@ export function drawSkyline(
 ): void {
   for (const b of blocks) {
     if (b.kind === 'gap') continue;
+
+    // The whole silhouette in the LIGHT value first, then the same silhouette
+    // dropped two pixels in the body value on top of it. What survives is a
+    // two-pixel lit rim along every top edge the shape has — the gable's
+    // slopes, the dome's curve, each parapet step — without one line of
+    // per-shape edge code. A rim traced per kind is a rim that goes wrong on
+    // the kind nobody re-checked.
+    g.fillStyle = s.lit;
+    massing(g, b, bot);
+    g.fill();
+
+    g.save();
+    g.translate(0, RIM);
     g.fillStyle = s.fill;
     massing(g, b, bot);
     g.fill();
+    g.restore();
 
     // Hatch is clipped to the silhouette, not to its bounding box — the whole
     // point of a vocabulary of shapes is lost if every one wears a square coat.
     g.save();
     massing(g, b, bot);
     g.clip();
+
+    // The shadow side. Always the left, because the moon is right of frame —
+    // see `SkylineStyle.shade`. Clipped, so on a spire it narrows with the
+    // point instead of standing beside it as a floating bar.
+    g.fillStyle = s.shade;
+    g.fillRect(b.x, b.top - RIM, Math.max(3, Math.round(b.w * 0.16)), bot - b.top + RIM);
 
     // Openings, cut as dark holes while we are still clipped to the silhouette.
     // Addendum §C.2 says a glowing thing is a HOLE in the hatching; until now
@@ -448,16 +509,33 @@ export function drawSkyline(
     if (s.openings) {
       g.fillStyle = s.ink;
       g.globalAlpha = 0.85;
-      for (const o of openings(b, bot)) {
+      const cut = openings(b, bot);
+      for (const o of cut) {
         if (o.kind === 'clock') {
           g.beginPath();
           g.arc(o.x + o.w / 2, o.y + o.h / 2, o.w / 2, 0, Math.PI * 2);
           g.fill();
         } else {
           g.fillRect(o.x, o.y, o.w, o.h);
+          // A pointed head, two pixels of it. This is the whole gothic accent
+          // at window scale: a lancet is a rectangle that loses a pixel from
+          // each shoulder, and at 4x7 that is all the arch there is room for.
+          // Louvres stay square — a belfry opening is a slot, not a window.
+          if (o.kind === 'window' && o.w >= 4) {
+            g.fillRect(o.x + 1, o.y - 2, o.w - 2, 2);
+          }
         }
       }
       g.globalAlpha = 1;
+
+      // Sills, cut after every hole so a sill can never be punched out by the
+      // window below it. One lit pixel under each opening — the row of them is
+      // what turns a grid of dark squares into storeys with floors between.
+      g.fillStyle = s.lit;
+      for (const o of cut) {
+        if (o.kind === 'clock') continue;
+        g.fillRect(o.x - 1, o.y + o.h, o.w + 2, 1);
+      }
     }
     g.restore();
   }
@@ -468,65 +546,147 @@ export function drawSkyline(
   // surface texture they sat on has gone with them.
   if (!s.details) return;
 
-  g.fillStyle = s.ink;
   for (const b of blocks) {
     if (b.kind === 'gap') continue;
     const bh = bot - b.top;
     const cx = Math.round(b.x + b.w / 2);
+    // Reset per block, not once before the loop. Cases now paint in three
+    // values, and whichever one the last block finished on would otherwise be
+    // the colour the next one starts drawing its ironwork in.
+    g.fillStyle = s.ink;
     switch (b.kind) {
       case 'flat': {
+        // EVERYTHING on this roof is measured off the UPPER mass, never the
+        // slot. A stepped box's roof is `inset` narrower on each side, and a
+        // cornice drawn at the slot's width hung sixteen pixels out into open
+        // sky on both sides of the tower — the horizontal lines that ran
+        // through the skyline like scaffolding. Chimney pots spread across the
+        // slot floated off the shoulder for the same reason.
+        const sb = setbackOf(b, bot);
+        const ux = sb ? b.x + sb.inset : b.x;
+        const uw = sb ? b.w - sb.inset * 2 : b.w;
+        const ucx = Math.round(ux + uw / 2);
+
         // Chimney pots. Terraces without them read as filing cabinets.
         g.fillStyle = s.fill;
         for (let k = 0; k < 3; k++) {
-          g.fillRect(Math.round(b.x + b.w * (0.2 + k * 0.3)), b.top - 7, 3, 7);
+          g.fillRect(Math.round(ux + uw * (0.2 + k * 0.3)), b.top - 7, 3, 7);
         }
         // A water tank on the roof of the wider ones — the prop that says a
         // flat roof is used rather than merely flat.
-        if (b.w > 40) {
-          g.fillRect(cx - 6, b.top - 9, 12, 9);
-          g.fillStyle = s.ink;
-          g.fillRect(cx - 6, b.top - 10, 12, 1);
+        if (uw > 40) {
+          g.fillRect(ucx - 6, b.top - 9, 12, 9);
+          g.fillStyle = s.lit;
+          g.fillRect(ucx - 6, b.top - 10, 12, 1);
         }
-        g.fillStyle = s.ink;
-        g.fillRect(b.x, b.top + 8, b.w, 2);
+        // Cornice: a dark course with a lit lip riding on top of it. Two values
+        // is what makes it read as a projecting ledge instead of a painted
+        // stripe. Two courses at most — the parapet's, and the shoulder's where
+        // a stepped box actually has a ledge. A band every few storeys was
+        // tried and it put the skyline straight back to reading as scaffolding.
+        const course = (y: number, cxx: number, cww: number) => {
+          g.fillStyle = s.ink;
+          g.fillRect(cxx, y, cww, 2);
+          g.fillStyle = s.lit;
+          g.fillRect(cxx, y - 1, cww, 1);
+        };
+        course(b.top + 8, ux, uw);
+        if (sb) course(sb.shoulder, b.x, b.w);
+        // The plinth the whole thing stands on, in shadow.
+        g.fillStyle = s.shade;
+        g.fillRect(b.x, bot - 4, b.w, 4);
         break;
       }
       case 'gable': {
-        const eave = Math.round(b.top + bh * 0.34);
+        const eave = eaveOf(b, bot);
+        // Shingle courses down both slopes, stepped like a pixel line rather
+        // than drawn as one. This is the Stardew roof: a slope is not a colour,
+        // it is a stack of short bars each one pixel below its neighbour.
+        const half = Math.round(b.w / 2);
+        for (let k = 1; k <= 3; k++) {
+          const t = k / 4;
+          const dy = Math.round(eave - b.top) * t;
+          const dx = Math.round(half * t);
+          g.fillStyle = k % 2 === 0 ? s.shade : s.ink;
+          g.fillRect(cx - dx, Math.round(b.top + dy), dx * 2, 1);
+        }
         // One dormer, off centre: a symmetrical roof reads as a diagram.
-        const dx = Math.round(b.x + b.w * 0.62);
+        const dx0 = Math.round(b.x + b.w * 0.62);
         g.fillStyle = s.fill;
-        g.fillRect(dx - 4, eave - 9, 8, 9);
+        g.fillRect(dx0 - 4, eave - 9, 8, 9);
+        g.fillStyle = s.lit;
+        g.fillRect(dx0 - 5, eave - 10, 10, 1);
         g.fillStyle = s.ink;
-        g.fillRect(dx - 5, eave - 10, 10, 1);
-        g.fillRect(dx - 2, eave - 7, 4, 4);
+        g.fillRect(dx0 - 2, eave - 7, 4, 4);
+        // The eaves board, overhanging by a pixel each side as eaves do.
+        g.fillRect(b.x - 1, eave, b.w + 2, 2);
         break;
       }
       case 'spire': {
-        // A finial, and nothing else. The crockets that used to climb the
-        // edges were four-pixel diagonal strokes, and at this size they read
-        // as grit blown across the sky.
-        g.fillRect(cx - 1, b.top - 8, 2, 8);
+        // Crockets: the gothic hooks that climb a spire's edges. They were
+        // deleted once as four-pixel diagonal STROKES; as filled 2x2 blocks
+        // stepping down the slope they are the same ornament drawn the way
+        // this picture draws everything else.
+        const eave = eaveOf(b, bot);
+        // In `shade`, not ink, and straddling the edge by a pixel. A needle at
+        // the top of the band is veiled almost to the fog's own value, and an
+        // ink crocket sitting a pixel clear of it reads as a fly rather than as
+        // stonework — the same failure the stroked ones had, in another form.
+        g.fillStyle = s.shade;
+        for (let k = 1; k <= 3; k++) {
+          const t = k / 4;
+          const y = Math.round(b.top + (eave - b.top) * t);
+          const dx = Math.round((b.w / 2) * t);
+          g.fillRect(cx - dx - 1, y, 2, 2);
+          g.fillRect(cx + dx - 1, y, 2, 2);
+        }
+        // A cross finial. A spire is a church before it is a shape, and the
+        // cross is what says so at eight pixels.
+        g.fillRect(cx - 1, b.top - 9, 2, 9);
         g.fillRect(cx - 3, b.top - 6, 6, 2);
         break;
       }
       case 'dome': {
-        const dr = Math.min(b.w * 0.34, 26);
+        const dr = Math.round(Math.min(b.w * 0.34, 26));
         // The lantern on top. It is what makes a dome a dome and not a hill.
         g.fillStyle = s.fill;
         g.fillRect(cx - 4, b.top - 8, 8, 8);
-        g.fillStyle = s.ink;
+        g.fillStyle = s.lit;
         g.fillRect(cx - 5, b.top - 9, 10, 1);
+        g.fillStyle = s.ink;
         g.fillRect(cx - 1, b.top - 13, 2, 4);
+        // Meridian ribs, stopping short of the springing so they read as
+        // curving away from the eye rather than as bars laid over the dome.
+        g.fillStyle = s.shade;
+        for (const f of [-0.62, -0.24, 0.24, 0.62]) {
+          const rx = Math.round(cx + dr * f);
+          const drop = Math.round(dr * (1 - Math.abs(f) * 0.55));
+          g.fillRect(rx, b.top + dr - drop + 2, 1, drop);
+        }
         // A band at the springing, where the dome meets its drum.
-        g.fillRect(Math.round(cx - dr), Math.round(b.top + dr), Math.round(dr * 2), 2);
+        g.fillStyle = s.ink;
+        g.fillRect(cx - dr, b.top + dr, dr * 2, 2);
+        g.fillStyle = s.lit;
+        g.fillRect(cx - dr, b.top + dr - 1, dr * 2, 1);
         break;
       }
       case 'clockTower': {
         const sw = Math.min(b.w, 30);
         const sx = Math.round(b.x + (b.w - sw) / 2);
-        g.fillRect(sx - 3, Math.round(b.top + sw * 0.9), sw + 6, 2);
+        const stage = Math.round(b.top + sw * 0.9);
+        // The clock stage, and the battlement standing on it. Merlons are the
+        // one ornament that says Yharnam rather than "town hall" — four teeth
+        // of solid stone with sky cut between them.
+        g.fillStyle = s.ink;
+        g.fillRect(sx - 3, stage, sw + 6, 2);
+        g.fillStyle = s.lit;
+        g.fillRect(sx - 3, stage - 1, sw + 6, 1);
+        g.fillStyle = s.fill;
+        for (let k = 0; k < 4; k++) {
+          g.fillRect(Math.round(sx - 2 + k * ((sw + 4) / 4)), stage - 6, 3, 6);
+        }
         // Hands, frozen. A clock that ticks in a painted city reads as a bug.
+        g.fillStyle = s.ink;
         const face = Math.max(9, Math.round(sw * 0.5));
         const fx = Math.round(sx + sw / 2);
         const fy = Math.round(b.top + sw + face / 2);
@@ -542,6 +702,13 @@ export function drawSkyline(
           g.fillRect(sx - 1, Math.round(b.top + bh * f), sw + 2, 2);
         }
         g.fillRect(sx - 2, b.top, sw + 4, 2);
+        // The shed's eaves course, where the roof meets the wall.
+        const shoulder = Math.round(b.top + bh * 0.62);
+        g.fillRect(b.x, shoulder, b.w, 2);
+        g.fillStyle = s.lit;
+        g.fillRect(b.x, shoulder - 1, b.w, 1);
+        g.fillStyle = s.shade;
+        g.fillRect(b.x, bot - 4, b.w, 4);
         break;
       }
       case 'crane': {

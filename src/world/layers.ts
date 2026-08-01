@@ -22,6 +22,25 @@ export function inkFor(v: AmbientValues): string {
 }
 
 /**
+ * The lit and shadowed faces of a body on a given rung.
+ *
+ * Both are mixed from the SAME two anchors every other depth uses — the fog
+ * above and the ink below — so a building's three values stay on the one ladder
+ * instead of forming a private scale of their own. `strength` is how far the
+ * band is allowed to separate: the far band gets half, because distance takes
+ * value separation before it takes anything else.
+ */
+export function facets(
+  fill: string, v: AmbientValues, strength: number,
+): { lit: string; shade: string } {
+  const body = hexToRgb(fill);
+  return {
+    lit: rgbToHex(mixRgb(body, hexToRgb(v.sky[2]), 0.30 * strength)),
+    shade: rgbToHex(mixRgb(body, [4, 6, 8], 0.34 * strength)),
+  };
+}
+
+/**
  * The static plate: everything that only changes when the palette, the size, or
  * the weather does.
  *
@@ -68,6 +87,10 @@ export function drawStatic(
   drawSkyline(g, far, hz.cityBot, {
     fill: ladder.cityFar,
     ink,
+    // Half the near band's separation. Distance flattens VALUE before it takes
+    // detail away — a far tower with the near band's shading would step in
+    // front of it however pale its body is.
+    ...facets(ladder.cityFar, v, 0.5),
     density: 0.18,
     openings: false,
     details: false,
@@ -77,6 +100,7 @@ export function drawStatic(
   drawSkyline(g, blocks, hz.cityBot, {
     fill: ladder.city,
     ink,
+    ...facets(ladder.city, v, 1),
     density: 0.34,
     openings: true,
     details: true,

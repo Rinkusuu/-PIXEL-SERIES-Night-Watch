@@ -74,7 +74,7 @@ describe('openings', () => {
 describe('openings are cut into the plate', () => {
   const blocks = skyline(1400, 100, 460, 17);
   const style = {
-    angle: -0.42, fill: '#222', ink: '#000', density: 0.34, details: false,
+    angle: -0.42, fill: '#222', ink: '#000', lit: '#333', shade: '#111', density: 0.34, details: false,
   };
 
   it('does more drawing when the openings are switched on', () => {
@@ -91,11 +91,13 @@ describe('openings are cut into the plate', () => {
     drawSkyline(off.g, blocks, 460, { ...style, openings: false });
     drawSkyline(on.g, blocks, 460, { ...style, openings: true });
     const total = blocks.flatMap((b) => openings(b, 460));
-    const rects = total.filter((o) => o.kind !== 'clock').length;
-    const clocks = total.filter((o) => o.kind === 'clock').length;
-    // A rect is one fillRect; a clock face is beginPath + arc + fill. The
+    // A clock face is beginPath + arc + fill and gets no sill. Everything else
+    // is the hole, a lit sill under it, and — where there is room for one — the
+    // two pixels of pointed head that make it a lancet rather than a slot. The
     // fillStyle and globalAlpha assignments around them are property SETS, and
     // countingCtx only counts gets.
-    expect(on.calls() - off.calls()).toBe(rects + clocks * 3);
+    const cost = (o: (typeof total)[number]) =>
+      o.kind === 'clock' ? 3 : o.kind === 'window' && o.w >= 4 ? 3 : 2;
+    expect(on.calls() - off.calls()).toBe(total.reduce((n, o) => n + cost(o), 0));
   });
 });
