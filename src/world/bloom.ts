@@ -63,6 +63,18 @@ export function lampSpots(
     if (b.kind === 'crane') continue;
     for (const o of openings(b, hz.cityBot)) {
       if (o.kind !== 'window') continue;
+      // Nothing below the upstream bridge's parapet is visible. The roadway
+      // runs the full width of the frame from `bridgeTop` down, and what shows
+      // through its arches is the embankment, which rises to meet the crown —
+      // so the city's lower storeys are behind stone everywhere.
+      //
+      // The bloom pass is drawn LIVE, over the finished plate, so occlusion
+      // that the plate handles correctly by painting one thing over another
+      // does not happen here: a window the bridge covers still lit a halo on
+      // top of the bridge. It has to be culled at the source, and the source is
+      // this list — which the river's glitter columns read too, so a lamp
+      // culled here also stops reflecting.
+      if (o.y + o.h / 2 >= hz.bridgeTop) continue;
       candidates.push({
         x: Math.round(o.x + o.w / 2),
         y: Math.round(o.y + o.h / 2),
