@@ -209,16 +209,35 @@ adalah malam hujan.** Kerjakan lebih dulu dari apa pun di ronde 6.
 **Mode gagal.** Hujan yang menembus dek juga menembus panel kaca kalau digambar
 setelahnya. Cek urutan di `renderer.ts`.
 
-### 6.2 Tidak ada genangan — item 21
+### 6.2 Tidak ada genangan — item 21 — **DICORET**
 
-**Bukti.** `wet = 0.18` di `layers.ts:69` cuma menggelapkan isian secara rata.
+Ditulis, diukur, dibuang. Dicatat di sini supaya tidak ditulis ulang.
 
-**Yang digambar.** Tiga sampai lima genangan di dek, deterministik dari
-`nightKey()`, masing-masing menangkap satu halo lampu gas terdekat sebagai kolom
-pantulan pendek. Gambar paling atmosferik yang tersedia di seluruh antrean.
+Rencananya: tiga sampai lima genangan di dek, masing-masing menangkap halo lampu
+gas terdekat sebagai kolom pantulan. Di atas kertas ini gambar paling atmosferik
+di seluruh antrean.
 
-**Mode gagal.** Genangan di pelat statis lalu ditimpa vignette. Vignette digambar
-terakhir (`4501d85`) — genangan harus ikut pass live.
+**Kenapa tidak bisa.** Dek — `railBot` sampai dasar frame — tertutup baris panel
+kaca hampir seluruhnya. Diukur dari DOM di viewport 1512×806:
+
+```
+deckTop / railBot   584        dasar frame   806     → pita dek 222 px
+panel                581 – 786  (tiga panel, alpha 0.86)
+terlihat            strip bawah 20 px, margin kiri/kanan 32 px, dua celah 20 px
+```
+
+Sekitar 86% pita dek berada di balik kaca, dan kaca itu 86% opak. Balustrade
+memang terlihat, tapi balustrade adalah pagar, bukan lantai — genangan tidak
+berdiri di sana.
+
+Ini persis aturan D. Komposisinya tidak punya lantai yang terlihat: pemain
+berdiri di dek yang UI-nya duduk di atasnya, dan itu keputusan yang benar untuk
+aplikasinya. Item 21 mengandaikan lantai yang tidak ada.
+
+**Konsekuensi untuk sisa ronde 6.** Item 19 (sett kertas grafik), 22 (kerb) dan
+23 (perabot) berdiri di atas asumsi yang sama dan kemungkinan besar ikut gugur.
+Ukur dulu sebelum menulis kodenya. Item 24 (baluster) dan 6.1 (hujan) selamat:
+balustrade terlihat, dan hujan turun melewati celah antar panel dan strip bawah.
 
 ### 6.3 Sett kertas grafik — item 19
 
@@ -297,12 +316,12 @@ persis terbalik. Ini pelanggaran aturan B di tempat lain, dan sama dengan bug
 ## Urutan, dan alasannya
 
 ```
-6.1  hujan tidak sampai ke kaki      cacat, satu baris, 20% malam
-8.3  arah nilai asap terbalik        cacat, satu baris
-4.1  lampu jembatan melayang         cacat, sepuluh baris
+6.1  hujan tidak sampai ke kaki      cacat, satu baris, 20% malam    SELESAI
+8.3  arah nilai asap terbalik        cacat, satu baris               SELESAI
+4.1  lampu jembatan melayang         cacat, sepuluh baris            SELESAI
 ─────────────────────────────────── di atas ini bug, di bawah ini detail
-8.1  berkas cahaya                   dampak tertinggi yang tersisa
-6.2  genangan
+8.1  berkas cahaya                   dampak tertinggi yang tersisa   SELESAI
+6.2  genangan                       DICORET — dek tertutup panel kaca
 5.1  pantulan tongkang
 4.2  4.3  4.5  parapet, voussoir, teluk
 4.4  riak cutwater
