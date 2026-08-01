@@ -23,6 +23,33 @@ export const STANDARD_X = 0.105;
 const BRACKET_REACH = 3.2;
 const SHAFT_W = 9;
 
+const GATE_BARS = 7;
+const GATE_PITCH = 11;
+const PIER_W = 26;
+
+/**
+ * The ground each gate actually stands on, pier and open leaf together.
+ *
+ * `deck.ts` needs it to leave a hole in the balustrade — a run of stone posts
+ * marching straight through a gateway says the ironwork is painted on. It has
+ * to come from HERE, the module that draws the gate, or the hole drifts from
+ * its own gate and reads as a missing post instead of as an opening.
+ *
+ * Asymmetric on purpose: the leaf is swung open INWARD against its pier, so
+ * the ground it covers runs one way only. A clearance measured evenly either
+ * side of the pier ate the frame edge and left the leaf's far end standing on
+ * balusters.
+ */
+export function gateSpans(w: number): { x0: number; x1: number }[] {
+  const reach = 20 + (GATE_BARS - 1) * GATE_PITCH + 6;
+  const l = w * GATE_X.left;
+  const r = w * GATE_X.right;
+  return [
+    { x0: l - PIER_W / 2 - 6, x1: l + reach },
+    { x0: r - reach, x1: r + PIER_W / 2 + 6 },
+  ];
+}
+
 /**
  * Where the flame hangs. `bloom.ts` reads this so the never-extinguished lamp
  * (addendum §D.1) lands inside its own glass housing instead of floating beside
@@ -46,7 +73,7 @@ export function lanternAnchor(w: number, hz: Horizon): { x: number; y: number } 
  * there is, and a shape carries as much information as you cut into its edge.
  */
 function gatePier(g: CanvasRenderingContext2D, cx: number, hz: Horizon): void {
-  const pw = 26;
+  const pw = PIER_W;
   const x = cx - pw / 2;
   // Shaft, from the bottom of the frame to well above the parapet. A pier only
   // as tall as the railing disappears into the railing.
@@ -77,8 +104,8 @@ function gateLeaf(
 ): void {
   // Swung OPEN, flat against the pier. An arched gate would fight the bridge's
   // arches, and two curved framings in one picture weaken each other.
-  const bars = 7;
-  const pitch = 11;
+  const bars = GATE_BARS;
+  const pitch = GATE_PITCH;
   const top = hz.railTop;
   const bot = hz.deckTop;
   for (let i = 0; i < bars; i++) {

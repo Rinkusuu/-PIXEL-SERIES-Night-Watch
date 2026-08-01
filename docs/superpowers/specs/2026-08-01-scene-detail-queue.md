@@ -239,23 +239,48 @@ aplikasinya. Item 21 mengandaikan lantai yang tidak ada.
 Ukur dulu sebelum menulis kodenya. Item 24 (baluster) dan 6.1 (hujan) selamat:
 balustrade terlihat, dan hujan turun melewati celah antar panel dan strip bawah.
 
-### 6.3 Sett kertas grafik — item 19
+### 6.3 Sett kertas grafik — item 19 — **DICORET**
 
 **Bukti.** `deck.ts:89-91` — `pitch` seragam per baris, `offset` selang-seling
-rapi. Jitter lebar per sett dari `stream()`.
+rapi. Klaimnya benar.
 
-**Mode gagal.** Jitter lebih dari ±20% dan permukaannya terbaca sebagai puing.
+**Kenapa tidak dikerjakan.** Sama dengan genangan: `settRows()` menggambar dari
+`deckTop` ke dasar frame, dan panel menutup 86% pita itu. Yang tersisa terlihat
+adalah margin sisi 32 px, dua celah 20 px, dan strip bawah 20 px.
 
-### 6.4 Tidak ada kerb — item 22, dan baluster identik — item 24
+Yang membuat item ini gugur bukan cuma luasnya, tapi **jenis cacatnya**. "Kertas
+grafik" adalah cacat *pola* — mata baru bisa membaca keteraturan kalau melihat
+bidang yang lebar. Di strip selebar 32 px tidak ada grid yang bisa dibaca sama
+sekali, jadi memperbaiki keteraturan di tempat keteraturannya tidak terlihat
+tidak membeli apa pun.
 
-Kerb: satu blok terang setinggi 3 px di kaki parapet, sepanjang frame. Baluster:
-newel yang lebih tebal tiap enam baluster, dan satu jeda di tempat gerbang
-berdiri — posisi gerbang dari `foreground.ts`, aturan A.
+### 6.4 Tidak ada kerb — item 22 — **DICORET**
 
-### 6.5 Dua perabot total — item 23
+Kerb berdiri di kaki parapet, yaitu tepat di `deckTop`. Panel dimulai di
+`deckTop - 3`. Bendanya akan digambar persis di bawah tepi atas kaca.
 
-**Bukti.** `deck.ts:101-106` — satu bollard, satu busur cincin tambat. Tambah:
-kisi drainase, tumpukan peti di tepi frame, papan nama jalan di tiang gas.
+### 6.5 Dua perabot total — item 23 — **DIKECILKAN**
+
+Kisi drainase dan tumpukan peti berdiri di lantai, dan lantainya tidak terlihat.
+Yang tersisa dari item ini adalah perabot yang berdiri **di parapet**, bukan di
+dek — dan bollard yang sudah ada memang begitu (`deck.ts:151` menggambarnya dari
+`deckTop - bollardH` ke atas, masuk ke pita balustrade). Papan nama jalan di
+tiang gas masih mungkin; sisanya tidak.
+
+### 6.6 Baluster identik — item 24 — **SELESAI**
+
+Satu-satunya item ronde 6 yang berdiri di permukaan yang terlihat penuh:
+balustrade menempati `railTop` sampai `railBot`, dan panel baru mulai tiga pixel
+di atas `railBot`.
+
+Dua perbaikan, dua-duanya struktural bukan hiasan: **newel** tiap tujuh baluster
+(pier persegi, bukan vas yang dibesarkan — perbedaan profil itulah iramanya),
+dan **jeda di tempat gerbang berdiri**. Rentang jedanya datang dari
+`gateSpans()` di `foreground.ts`, modul yang menggambar gerbangnya (aturan A).
+Percobaan pertama memakai jarak bebas simetris di sekitar pusat gerbang dan itu
+salah: daun gerbang terayun terbuka **ke dalam**, jadi tanah yang ditutupinya
+berjalan satu arah saja. Yang simetris memakan tepi frame dan meninggalkan ujung
+jauh daun berdiri di atas baluster.
 
 ---
 

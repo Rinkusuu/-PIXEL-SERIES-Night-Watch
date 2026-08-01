@@ -1,4 +1,5 @@
 import type { Horizon } from './horizon';
+import { gateSpans } from './foreground';
 
 const BALUSTER_W = 8;
 const BALUSTER_GAP = 6;
@@ -22,11 +23,38 @@ export function settRows(hz: Horizon): number[] {
   return rows;
 }
 
-export function balusters(w: number): { x: number; w: number }[] {
+/** One newel for every this many plain balusters. */
+const NEWEL_EVERY = 7;
+/** How much wider a newel is than the vases either side of it. */
+const NEWEL_W = 13;
+
+export type Baluster = { x: number; w: number; newel: boolean };
+
+/**
+ * The balustrade, edge to edge — except where the gate stands.
+ *
+ * Every post used to be identical, at one pitch, running clean through the two
+ * gate openings as though the ironwork were painted onto the stone. Two things
+ * fix that and both are structural rather than decorative:
+ *
+ * - **Newels.** A run of stone balusters is carried by a heavier post every few
+ *   feet; without them the run has no rhythm and, more to the point, nothing
+ *   holding it up. It is the same fault the skyline had before it got setbacks.
+ * - **The gate opening.** Where the gate is, there is no balustrade — that is
+ *   what a gate IS. The x's come from `foreground.ts`, which draws the gate,
+ *   rather than from a second guess here (rule A): a gap that drifts from its
+ *   own gate is worse than no gap, because it reads as a missing post.
+ */
+export function balusters(w: number): Baluster[] {
   const pitch = BALUSTER_W + BALUSTER_GAP;
-  const out: { x: number; w: number }[] = [];
-  for (let x = 0; x < w + pitch; x += pitch) {
-    out.push({ x: Math.round(x), w: BALUSTER_W });
+  const out: Baluster[] = [];
+  const gates = gateSpans(w);
+  let i = 0;
+  for (let x = 0; x < w + pitch; x += pitch, i++) {
+    const newel = i % NEWEL_EVERY === 0;
+    const bw = newel ? NEWEL_W : BALUSTER_W;
+    if (gates.some((gt) => x + bw > gt.x0 && x < gt.x1)) continue;
+    out.push({ x: Math.round(x), w: bw, newel });
   }
   return out;
 }
@@ -52,6 +80,16 @@ export function drawDeck(
   const bodyTop = hz.railTop + capH;
   const bodyH = railH - capH - plinthH;
   for (const b of balusters(w)) {
+    // A newel is a square pier, not a vase — that difference IS the rhythm.
+    // Giving it the same profile at a larger size just reads as one baluster
+    // that came out wrong.
+    if (b.newel) {
+      g.fillStyle = s.rail;
+      g.fillRect(b.x, bodyTop - 2, b.w, bodyH + 4);
+      g.fillRect(b.x - 2, bodyTop - 2, b.w + 4, 3);
+      g.fillRect(b.x - 2, bodyTop + bodyH - 1, b.w + 4, 3);
+      continue;
+    }
     // A vase, not a post: narrow at the neck, swelling low. Two trapezoids are
     // enough at this size, and they survive the blur where a curve would not.
     const neck = b.w * 0.45;
