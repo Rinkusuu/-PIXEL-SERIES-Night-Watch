@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  remainingMs,
   elapsedMs, initialState, progressOf, reduce,
   type SessionState,
 } from '../../src/session/machine';
@@ -111,5 +112,32 @@ describe('changing duration mid-hunt', () => {
     const { state, completed } = reduce(shortened.state, { type: 'tick', at: T0 + 20 * MIN });
     expect(state.phase).toBe('respite');
     expect(completed!.minutes).toBe(5);
+  });
+});
+
+describe('remainingMs', () => {
+  const MIN2 = 60_000;
+  const base = initialState(50, 10);
+
+  it('counts the RESPITE down, not the hunt', () => {
+    // It was computed inline in useNightWatch as `huntMs - elapsed` for every
+    // phase, and `startedAt` is reset to the start of the break — so a
+    // ten-minute rest displayed a fifty-minute countdown that stopped at 40:06.
+    const rest: SessionState = { ...base, phase: 'respite', startedAt: T0, frozenProgress: 1 };
+    expect(remainingMs(rest, T0)).toBe(10 * MIN2);
+    expect(remainingMs(rest, T0 + 5 * MIN2)).toBe(5 * MIN2);
+    expect(remainingMs(rest, T0 + 10 * MIN2)).toBe(0);
+  });
+
+  it('counts the hunt down against the hunt', () => {
+    const hunt: SessionState = { ...base, phase: 'hunt', startedAt: T0 };
+    expect(remainingMs(hunt, T0)).toBe(50 * MIN2);
+    expect(remainingMs(hunt, T0 + 20 * MIN2)).toBe(30 * MIN2);
+  });
+
+  it('never runs negative, and shows the full hunt when idle', () => {
+    expect(remainingMs(base, T0 + 99 * MIN2)).toBe(50 * MIN2);
+    const hunt: SessionState = { ...base, phase: 'hunt', startedAt: T0 };
+    expect(remainingMs(hunt, T0 + 99 * MIN2)).toBe(0);
   });
 });

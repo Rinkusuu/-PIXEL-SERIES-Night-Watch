@@ -4,12 +4,13 @@ import { Meter } from '../components/Meter';
 import { Panel } from '../components/Panel';
 import { Ico } from '../components/Ico';
 import { COPY, ambientLine, formatClock } from '../app/copy';
-import { motionLabel } from '../app/motion';
+import { Settings as SettingsForm } from './Settings';
 import type { Phase } from '../session/machine';
-import type { Settings } from '../store/schema';
+import type { Alerts, Settings } from '../store/schema';
 
 export function TheWatch({
-  phase, progress, remainingMs, quarryName, bloodmoon, motionSetting,
+  phase, progress, remainingMs, quarryName, bloodmoon, settings,
+  settingsOpen, onToggleSettings, onDurations, onToggleAlert,
   onStart, onStop, onSkip, onCycleMotion,
 }: {
   phase: Phase;
@@ -17,7 +18,11 @@ export function TheWatch({
   remainingMs: number;
   quarryName: string | null;
   bloodmoon: boolean;
-  motionSetting: Settings['motion'];
+  settings: Settings;
+  settingsOpen: boolean;
+  onToggleSettings: () => void;
+  onDurations: (hunt: number, respite: number) => void;
+  onToggleAlert: (key: keyof Alerts) => void;
   onStart: () => void;
   onStop: () => void;
   onSkip: () => void;
@@ -35,11 +40,12 @@ export function TheWatch({
         <button
           type="button"
           className="btn"
-          onClick={onCycleMotion}
-          title={motionLabel(motionSetting)}
-          aria-label={motionLabel(motionSetting)}
+          onClick={onToggleSettings}
+          aria-expanded={settingsOpen}
+          title={COPY.keys}
+          aria-label="pengaturan"
         >
-          <Ico name="motion" />
+          <Ico name="clock" />
         </button>
       }
     >
@@ -53,6 +59,13 @@ export function TheWatch({
           : <Button onClick={onStop}>{COPY.labels.stop}</Button>}
         <Button onClick={onSkip} disabled={phase === 'idle'}>{COPY.labels.skip}</Button>
       </div>
+      <SettingsForm
+        settings={settings}
+        open={settingsOpen}
+        onDurations={onDurations}
+        onToggleAlert={onToggleAlert}
+        onCycleMotion={onCycleMotion}
+      />
     </Panel>
   );
 }

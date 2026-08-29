@@ -228,3 +228,25 @@
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+
+/* ── Settings, folded into The Watch ─────────────────────────────────────── */
+.settings { margin-top: var(--px3); }
+.settings__row {
+  display: flex;
+  align-items: center;
+  gap: var(--px2);
+  padding: var(--px) 0;
+}
+/* The label takes the slack so every control lines up on one right edge,
+   however long the words in front of them run. */
+.settings__row > .label { flex: 1; min-width: 0; }
+.settings__opts { display: flex; gap: var(--px); }
+.settings__num {
+  width: 5em;
+  border: 0;
+  color: var(--amb-ink);
+  padding: var(--px) var(--px2);
+  font-family: var(--font-body);
+  font-size: var(--fs-small);
+  text-align: right;
+}

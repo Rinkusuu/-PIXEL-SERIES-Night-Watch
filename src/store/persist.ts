@@ -38,12 +38,14 @@ export function load(storage: Storage = localStorage): { data: Schema; recovered
     return { data: emptySchema(), recovered: true };
   }
 
-  // A missing settings block is a shape we can repair, not a corruption.
+  // A missing settings block is a shape we can repair, not a corruption. The
+  // same goes one level deeper for `alerts`: a store written before alerts
+  // existed has settings but no alerts, and spreading only the outer level
+  // would leave it `undefined` for every reader.
   const base = emptySchema();
-  return {
-    data: { ...parsed, settings: { ...base.settings, ...(parsed.settings ?? {}) } },
-    recovered: false,
-  };
+  const settings = { ...base.settings, ...(parsed.settings ?? {}) };
+  settings.alerts = { ...base.settings.alerts, ...(settings.alerts ?? {}) };
+  return { data: { ...parsed, settings }, recovered: false };
 }
 
 export function save(

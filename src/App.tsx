@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { World } from './world/Canvas';
 import { makeGrainUri } from './world/grain';
 import { useNightWatch } from './app/useNightWatch';
@@ -6,11 +6,24 @@ import { TheWatch } from './panels/TheWatch';
 import { TheQuarry } from './panels/TheQuarry';
 import { TheLedger } from './panels/TheLedger';
 import { COPY } from './app/copy';
+import { useKeys } from './app/useKeys';
 
 export function App() {
   const nw = useNightWatch();
   const gridRef = useRef<HTMLDivElement>(null);
   const [deckTop, setDeckTop] = useState(0);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Space is the one shortcut that has to exist: starting and stopping is what
+  // the app is for. `useKeys` ignores keys typed into a field, which is what
+  // keeps the quarry input usable with Space bound at the window.
+  const keys = useMemo(() => ({
+    ' ': () => (nw.session.phase === 'idle' ? nw.actions.start() : nw.actions.stop()),
+    s: () => { if (nw.session.phase !== 'idle') nw.actions.skip(); },
+    ',': () => setSettingsOpen((o) => !o),
+    escape: () => setSettingsOpen(false),
+  }), [nw.session.phase, nw.actions]);
+  useKeys(keys);
 
   useEffect(() => {
     document.documentElement.style.setProperty('--grain-uri', makeGrainUri());
@@ -53,7 +66,11 @@ export function App() {
             remainingMs={nw.remainingMs}
             quarryName={selected?.name ?? null}
             bloodmoon={nw.grades.includes('bloodmoon')}
-            motionSetting={nw.data.settings.motion}
+            settings={nw.data.settings}
+            settingsOpen={settingsOpen}
+            onToggleSettings={() => setSettingsOpen((o) => !o)}
+            onDurations={nw.actions.setDurations}
+            onToggleAlert={nw.actions.toggleAlert}
             onStart={nw.actions.start}
             onStop={nw.actions.stop}
             onSkip={nw.actions.skip}

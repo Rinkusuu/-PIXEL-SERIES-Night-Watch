@@ -18,11 +18,38 @@ export type SessionRecord = {
   quarryId: string | null;
 };
 
+/**
+ * How the end of a phase announces itself.
+ *
+ * All three default ON except `notify`, which cannot: the Notification API
+ * needs a permission prompt, and a prompt the user never asked for is exactly
+ * the kind of thing this app has no server and no account in order to avoid.
+ * It turns on when they ask for it, and asks for permission at that moment.
+ */
+export type Alerts = {
+  /** Countdown in the tab title. The one that works with no permission at all. */
+  title: boolean;
+  /** A soft two-note chime at dawn, via WebAudio. No asset, no network. */
+  chime: boolean;
+  /** Browser notification. Off until granted. */
+  notify: boolean;
+};
+
 export type Settings = {
   huntMinutes: number;
   respiteMinutes: number;
   motion: 'auto' | 'on' | 'off';
+  alerts: Alerts;
 };
+
+/** Bounds for the two durations. A zero-minute hunt is not a short session. */
+export const HUNT_RANGE = { min: 5, max: 120 } as const;
+export const RESPITE_RANGE = { min: 1, max: 60 } as const;
+
+export function clampMinutes(v: number, r: { min: number; max: number }): number {
+  if (!Number.isFinite(v)) return r.min;
+  return Math.min(r.max, Math.max(r.min, Math.round(v)));
+}
 
 export type Schema = {
   version: 1;
@@ -36,6 +63,11 @@ export function emptySchema(): Schema {
     version: 1,
     quarry: [],
     sessions: [],
-    settings: { huntMinutes: 50, respiteMinutes: 10, motion: 'auto' },
+    settings: {
+      huntMinutes: 50,
+      respiteMinutes: 10,
+      motion: 'auto',
+      alerts: { title: true, chime: true, notify: false },
+    },
   };
 }

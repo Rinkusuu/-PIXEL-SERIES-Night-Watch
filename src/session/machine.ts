@@ -43,6 +43,22 @@ export function elapsedMs(state: SessionState, now: number): number {
   return Math.max(0, now - state.startedAt);
 }
 
+/**
+ * Milliseconds left in whatever phase is actually running.
+ *
+ * It lives HERE, beside the state it reads, because `useNightWatch` used to
+ * compute it inline as `huntMs - elapsed` for every phase — including respite,
+ * where `startedAt` has been reset to the start of the BREAK. A ten-minute
+ * respite therefore displayed a fifty-minute countdown that stopped at 40:06
+ * and vanished, so the rest had no clock at all. Whichever phase is running
+ * owns the duration the clock counts against; one function, one answer.
+ */
+export function remainingMs(state: SessionState, now: number): number {
+  if (state.phase === 'idle') return state.huntMs;
+  const target = state.phase === 'respite' ? state.respiteMs : state.huntMs;
+  return Math.max(0, target - elapsedMs(state, now));
+}
+
 export function progressOf(state: SessionState, now: number): number {
   if (state.phase === 'idle') return 0;
   if (state.phase === 'respite') return state.frozenProgress;
