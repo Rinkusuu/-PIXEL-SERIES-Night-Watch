@@ -15,20 +15,27 @@ function isTyping(t: EventTarget | null): boolean {
   return ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName);
 }
 
+/**
+ * The whole decision, as a pure function — so the rules above can be tested
+ * without mounting anything. Returns whether the key was claimed.
+ */
+export function handleKey(map: Record<string, () => void>, e: KeyboardEvent): boolean {
+  // A modifier means the key belongs to the browser or the OS: ⌘S saves the
+  // page, and stealing it to skip a session would be indefensible.
+  if (e.metaKey || e.ctrlKey || e.altKey) return false;
+  if (isTyping(e.target)) return false;
+  const fn = map[e.key.toLowerCase()];
+  if (!fn) return false;
+  // Only now: preventDefault before knowing we handle the key would break Tab,
+  // and Space scrolls the page if it is not claimed.
+  e.preventDefault();
+  fn();
+  return true;
+}
+
 export function useKeys(map: Record<string, () => void>): void {
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      // A modifier means the key belongs to the browser or the OS: ⌘S saves the
-      // page, and stealing it to skip a session would be indefensible.
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (isTyping(e.target)) return;
-      const fn = map[e.key.toLowerCase()];
-      if (!fn) return;
-      // Only now: preventDefault before knowing we handle the key would break
-      // Tab, and Space scrolls the page if it is not claimed.
-      e.preventDefault();
-      fn();
-    };
+    const onKey = (e: KeyboardEvent) => void handleKey(map, e);
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [map]);

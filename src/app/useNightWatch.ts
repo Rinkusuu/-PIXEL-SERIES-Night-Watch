@@ -8,9 +8,12 @@ import {
   initialState, progressOf, reduce, remainingMs as remainingOf,
   type SessionEvent, type SessionState,
 } from '../session/machine';
-import { minutesByNight } from '../session/aggregate';
+import {
+  bestStreak, minutesByNight, minutesByQuarry, nightGrid, windowTotals,
+} from '../session/aggregate';
 import { streakLength } from '../session/streak';
 import { load, save } from '../store/persist';
+import { RETENTION_DAYS } from '../store/schema';
 import type { Schema } from '../store/schema';
 import { motionValue, nextMotion } from './motion';
 import { nightKey } from '../session/streak';
@@ -35,6 +38,28 @@ export function useNightWatch() {
 
   const streak = useMemo(() => streakLength(data.sessions, now), [data.sessions, now]);
   const ledger = useMemo(() => minutesByNight(data.sessions, now, 7), [data.sessions, now]);
+
+  // The store has kept RETENTION_DAYS of nights since it was written and the
+  // Ledger was reading seven of them. These are the other eighty-three.
+  const nightsGrid = useMemo(
+    () => nightGrid(data.sessions, now, RETENTION_DAYS), [data.sessions, now],
+  );
+  const best = useMemo(
+    () => bestStreak(data.sessions, now, RETENTION_DAYS), [data.sessions, now],
+  );
+  const totals = useMemo(
+    () => windowTotals(data.sessions, now, RETENTION_DAYS), [data.sessions, now],
+  );
+  // `minutesByQuarry` has existed since the session module was written and was
+  // called from nowhere. Resolved to names here, sorted, so the panel gets a
+  // list rather than a map keyed by an id it would have to look up itself.
+  const quarryTotals = useMemo(() => {
+    const byId = minutesByQuarry(data.sessions);
+    return data.quarry
+      .map((q) => ({ name: q.name, minutes: byId[q.id] ?? 0 }))
+      .filter((q) => q.minutes > 0)
+      .sort((a, b) => b.minutes - a.minutes);
+  }, [data.sessions, data.quarry]);
 
   // The night's weather, drawn once from the same key the streak counts by. It
   // must not change on a re-render, or the sky would reshuffle mid-session.
@@ -142,6 +167,13 @@ export function useNightWatch() {
     });
   }, []);
 
+  // Clearing the selection when the selected quarry goes away. Left behind, the
+  // machine would hold an id that resolves to nothing and the Watch would show
+  // a blank name above the clock for the rest of the session.
+  const dispatchIfSelected = useCallback((id: string) => {
+    setSession((s) => (s.quarryId === id ? reduce(s, { type: 'selectQuarry', quarryId: null }).state : s));
+  }, []);
+
   const actions = useMemo(() => ({
     start: () => dispatch({ type: 'start', at: Date.now() }),
     stop: () => dispatch({ type: 'stop', at: Date.now() }),
@@ -159,6 +191,35 @@ export function useNightWatch() {
       save(next);
       return next;
     }),
+    /**
+     * Removing a quarry does NOT remove the sessions logged against it — the
+     * ledger records what actually happened, and rewriting history because a
+     * task was tidied away would make the totals lie. The orphaned `quarryId`
+     * simply stops resolving to a name, which `quarryTotals` already handles by
+     * mapping over the quarry list rather than over the ids in the sessions.
+     */
+    removeQuarry: (id: string) => {
+      dispatchIfSelected(id);
+      setData((d) => {
+        const next: Schema = { ...d, quarry: d.quarry.filter((q) => q.id !== id) };
+        save(next);
+        return next;
+      });
+    },
+
+    renameQuarry: (id: string, name: string) => setData((d) => {
+      const trimmed = name.trim();
+      // An empty rename is a cancelled rename, not a request for a nameless
+      // task. Deleting is a separate, deliberate action.
+      if (trimmed === '') return d;
+      const next: Schema = {
+        ...d,
+        quarry: d.quarry.map((q) => (q.id === id ? { ...q, name: trimmed } : q)),
+      };
+      save(next);
+      return next;
+    }),
+
     toggleQuarryDone: (id: string) => setData((d) => {
       const next: Schema = {
         ...d,
@@ -231,10 +292,11 @@ export function useNightWatch() {
       save(next);
       return next;
     }),
-  }), [dispatch]);
+  }), [dispatch, dispatchIfSelected]);
 
   return {
     session, values, progress, motion, grades, data, remainingMs, streak, ledger, weather,
+    nightsGrid, best, totals, quarryTotals, retentionDays: RETENTION_DAYS,
     recovered: boot.recovered, actions,
   };
 }

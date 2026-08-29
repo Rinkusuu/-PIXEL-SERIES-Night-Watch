@@ -19,6 +19,20 @@ Fonts are self-hosted and are **not** committed. See
 - `npm run build` — typecheck then production build
 - `npm run typecheck` — `tsc --noEmit`
 
+## Using it
+
+- **Space** starts and stops the watch, **S** skips, **,** opens settings.
+  Keys typed into a field belong to that field — see `src/app/useKeys.ts`.
+- Hunt and respite lengths are set in The Watch's own settings fold. They are
+  not a fourth card on purpose: the grid is four columns and `App.tsx` measures
+  its top edge to place the balustrade, so a fourth card would redraw the
+  world's composition to hold six controls.
+- The end of a phase can announce itself three ways, each switchable: the tab
+  title (no permission, always available), a synthesised chime, and a browser
+  notification. Notification is off until asked for, and asks at that moment.
+- The Ledger shows the last seven nights, or the full retained window — the
+  store keeps ninety nights and the panel used to read seven of them.
+
 ## Design
 
 - Spec: `docs/superpowers/specs/2026-07-27-night-watch-design.md`

@@ -25,6 +25,23 @@ export const COPY = {
     motion: 'gerak',
     alertNames: { title: 'JUDUL', chime: 'LONCENG', notify: 'NOTIF' },
   },
+  quarry: {
+    rename: 'ubah nama',
+    remove: 'hapus dari daftar (riwayat tetap)',
+    renameMark: '/',
+    removeMark: '\u00d7',
+  },
+  ledger: {
+    toWindow: '90 MALAM',
+    toWeek: 'PEKAN',
+    streak: (n: number) => `streak ${n} malam`,
+    best: (n: number) => `rentetan terbaik ${n} malam`,
+    week: (m: number) => `${m}m minggu ini`,
+    window: (m: number, nights: number, days: number) =>
+      `${Math.round(m / 60)} jam · ${nights} dari ${days} malam`,
+    heatLabel: (days: number, nights: number) =>
+      `${nights} malam berjaga dari ${days} malam terakhir`,
+  },
   keys: 'spasi: mulai/henti · s: lewati · ,: pengaturan',
   labels: {
     start: 'MULAI',

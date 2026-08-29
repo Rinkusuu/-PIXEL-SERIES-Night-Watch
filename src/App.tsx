@@ -82,8 +82,18 @@ export function App() {
             onAdd={nw.actions.addQuarry}
             onSelect={nw.actions.selectQuarry}
             onToggleDone={nw.actions.toggleQuarryDone}
+            onRemove={nw.actions.removeQuarry}
+            onRename={nw.actions.renameQuarry}
           />
-          <TheLedger rows={nw.ledger} streak={nw.streak} />
+          <TheLedger
+            rows={nw.ledger}
+            grid={nw.nightsGrid}
+            quarryTotals={nw.quarryTotals}
+            streak={nw.streak}
+            best={nw.best}
+            totals={nw.totals}
+            days={nw.retentionDays}
+          />
         </div>
       </main>
       <div className="grain" />

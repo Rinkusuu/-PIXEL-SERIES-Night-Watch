@@ -250,3 +250,58 @@
   font-size: var(--fs-small);
   text-align: right;
 }
+
+/* ── Ledger ──────────────────────────────────────────────────────────────── */
+.ledger__row {
+  display: flex;
+  align-items: center;
+  gap: var(--px2);
+  padding: var(--px) 0;
+}
+.ledger__day { width: 5.5em; flex: none; }
+/* Long task names truncate rather than wrap: a two-line row would break the
+   rhythm the rest of the panel is built on. */
+.ledger__quarry { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* One cell per retained night. `auto-fill` rather than a fixed column count —
+   the panel's own width decides how the ninety nights wrap, which is why the
+   grid is handed to the view as a flat run and not pre-laid-out. */
+.heat {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7px, 1fr));
+  gap: 2px;
+  margin: var(--px) 0 var(--px2);
+}
+.heat__cell {
+  aspect-ratio: 1;
+  background: var(--amb-ink);
+  /* Zero is not invisible: an empty night still has to read as a night, or the
+     run of them stops being a calendar and becomes a scatter of marks. */
+  opacity: 0.14;
+}
+.heat__cell[data-band='1'] { background: var(--amb-glow); opacity: 0.3; }
+.heat__cell[data-band='2'] { background: var(--amb-glow); opacity: 0.5; }
+.heat__cell[data-band='3'] { background: var(--amb-glow); opacity: 0.72; }
+.heat__cell[data-band='4'] { background: var(--amb-glow); opacity: 1; }
+
+/* ── Quarry rows ─────────────────────────────────────────────────────────── */
+.quarry__row { display: flex; align-items: center; gap: var(--px2); padding: var(--px) 0; }
+.quarry__mins { margin-left: auto; flex: none; }
+.quarry__edit { flex: 1; display: flex; }
+.quarry__input {
+  flex: 1; min-width: 0; border: 0; color: var(--amb-ink);
+  padding: var(--px) var(--px2);
+  font-family: var(--font-body); font-size: var(--fs-small);
+}
+/* The row's own controls stay out of the way until the row is under the
+   pointer — a list of tasks should read as tasks, not as a toolbar per line.
+   They are always present for keyboard and screen readers, only faded. */
+.quarry__tools { display: flex; gap: 2px; flex: none; opacity: 0; transition: opacity 120ms; }
+.quarry__row:hover .quarry__tools,
+.quarry__tools:focus-within { opacity: 1; }
+@media (hover: none) { .quarry__tools { opacity: 1; } }
+.btn--bare {
+  padding: 0 var(--px2);
+  min-width: 0;
+  line-height: 1;
+}
