@@ -9,8 +9,12 @@ the session you are, not by the wall clock.
     npm install
     npm run dev
 
-Fonts are self-hosted and are **not** committed. See
-`docs/superpowers/plans/2026-07-27-night-watch.md`, Task 1 Step 3.
+Fonts are self-hosted and **are** committed — see `public/fonts/README.md`.
+They were left out originally, and the result was that both `@font-face` rules
+resolved to nothing for the whole life of the project: every face fell through
+to `ui-monospace`, silently, because `font-display: swap` is built to degrade
+without complaining. Eight kilobytes of OFL bitmap type is a cheap price for
+the identity not being optional.
 
 ## Scripts
 
