@@ -7,8 +7,13 @@ describe('the panels sit on the parapet', () => {
   const components = readFileSync('src/style/components.css', 'utf8');
 
 
-  it('docks the chrome to the bottom of the frame', () => {
-    expect(base).toContain('justify-content: flex-end');
+  it('docks the panel row to the bottom of the frame', () => {
+    // Was `flex-end`, which docked EVERY child to the bottom. With a top bar
+    // added that stacked the two together at the foot; `space-between` keeps
+    // the grid welded to the bottom edge — the thing `App.tsx` measures — and
+    // lets the bar rise to the top on its own.
+    expect(base).toMatch(/justify-content:\s*space-between/);
+    expect(base).toMatch(/min-height:\s*100%/);
   });
 
   it('cannot grow the chrome past the deck clamp', () => {
@@ -40,10 +45,11 @@ describe('the panels sit on the parapet', () => {
     expect(components).toContain('overflow-y: auto');
   });
 
-  it('still docks a tall grid to the bottom rather than centring it', () => {
-    // With two rows the grid is nearly half the frame. Centred, it would float
-    // over the river instead of standing on the stone.
-    expect(base).toContain('justify-content: flex-end');
+  it('puts the grid last, so `space-between` sends it to the bottom', () => {
+    // The order of the two children is what makes `space-between` mean
+    // "bar on top, panels on the stone" rather than the reverse.
+    const app = readFileSync('src/App.tsx', 'utf8');
+    expect(app.indexOf('<Header')).toBeLessThan(app.indexOf('className="grid"'));
   });
 
   it('bounds the quarry list so it cannot push the parapet off screen', () => {

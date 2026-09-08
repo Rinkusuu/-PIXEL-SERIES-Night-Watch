@@ -27,7 +27,11 @@ body {
   z-index: 1;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  /* The panel row stays welded to the bottom edge — `App.tsx` measures it to
+     place the balustrade. `space-between` puts the top bar at the top of the
+     frame without the grid moving a pixel; `flex-end` would have stacked them
+     both at the foot. */
+  justify-content: space-between;
   gap: var(--px6);
   padding: var(--px5) clamp(var(--px3), 3vw, var(--px8)) var(--px5);
   max-width: 1680px;
@@ -66,4 +70,16 @@ body {
 ::selection {
   background: color-mix(in oklab, var(--amb-accent) 55%, transparent);
   color: #0b0d1c;
+}
+
+/* Present to assistive technology, absent from the picture. `display: none`
+   would take it out of the accessibility tree as well, which defeats the
+   point of having it. */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

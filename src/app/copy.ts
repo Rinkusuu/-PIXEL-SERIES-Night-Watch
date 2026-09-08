@@ -5,6 +5,8 @@ import type { Phase } from '../session/machine';
  * The voice is a night watchman: it observes, it never encourages.
  */
 export const COPY = {
+  title: 'Night Watch',
+  tagline: 'satu malam berjaga di atas sungai.',
   idleWithQuarry: 'the lamps are unlit.',
   idleNoQuarry: 'no quarry named. the street is quiet.',
   dusk: 'the lamps are lit.',

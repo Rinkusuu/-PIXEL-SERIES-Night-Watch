@@ -5,7 +5,8 @@ import { useNightWatch } from './app/useNightWatch';
 import { TheWatch } from './panels/TheWatch';
 import { TheQuarry } from './panels/TheQuarry';
 import { TheLedger } from './panels/TheLedger';
-import { COPY } from './app/copy';
+import { COPY, ambientLine } from './app/copy';
+import { Header } from './components/Header';
 import { useKeys } from './app/useKeys';
 
 export function App() {
@@ -58,7 +59,20 @@ export function App() {
         deckTop={deckTop}
       />
       <main className="app">
-        {nw.recovered && <p className="label">{COPY.storeRecovered}</p>}
+        {/* The page had three h2 panels and nothing above them, so a screen
+            reader's heading list started at level two with no subject. It is
+            visually hidden rather than drawn: the title belongs in the header
+            bar below, and two of them would be one too many. */}
+        <h1 className="sr-only">{COPY.title}</h1>
+        <Header
+          streak={nw.streak}
+          line={nw.recovered ? COPY.storeRecovered : ambientLine({
+            phase: nw.session.phase,
+            progress: nw.progress,
+            hasQuarry: selected !== null,
+            bloodmoon: nw.grades.includes('bloodmoon'),
+          })}
+        />
         <div className="grid" ref={gridRef}>
           <TheWatch
             phase={nw.session.phase}

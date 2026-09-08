@@ -99,7 +99,10 @@
 }
 
 .divider {
-  height: 2px; margin: var(--px3) 0; border: 0;
+  /* Was `--px3`. The bitmap faces sit taller than the mono fallback they were
+     spaced against, and the Ledger's seven rows plus a divider plus a footer
+     overflowed its grid row by 11px once the real type arrived. */
+  height: 2px; margin: var(--px2) 0; border: 0;
   background: repeating-linear-gradient(90deg,
     color-mix(in oklab, var(--amb-mid) 90%, transparent) 0 4px,
     transparent 4px 8px);
@@ -200,7 +203,14 @@
 /* ── Hero digits ────────────────────────────────────────────────────────── */
 .digits {
   font-family: var(--font-display);
-  font-size: clamp(28px, 5.2vw, 54px);
+  /* A DISCRETE ladder, not a fluid clamp — DNA §14 asks for steps.
+     Not for anti-aliasing reasons: `base.css` sets `-webkit-font-smoothing:
+     none`, and a crop at 8x confirms the glyphs come out as hard squares at
+     any size. The reason is layout. A fluid hero size means the clock's width
+     changes with every viewport pixel, so the card it sits in has no size the
+     rest of its content can be laid out against — and this card is now a fixed
+     grid row with a stat column beside it. Steps of 8 keep it predictable. */
+  font-size: 24px;
   letter-spacing: 0.02em;
   color: var(--amb-ink);
   text-shadow:
@@ -305,6 +315,12 @@
   padding: 1px 0;
 }
 .ledger__day { width: 5.5em; flex: none; }
+/* The week view is seven rows, a divider and a footer inside one fixed grid
+   row. Bitmap faces carry a taller default line box than the mono fallback
+   this was spaced against, so the slack comes from the line height and the
+   meter rather than from another pixel of padding. */
+.ledger__row { line-height: 1; }
+.ledger__row .meter { height: var(--px2); }
 .ledger__bar { flex: 1; min-width: 0; }
 .ledger__mins { flex: none; width: 4em; text-align: right; }
 /* Long task names truncate rather than wrap: a two-line row would break the
@@ -333,7 +349,14 @@
 .heat__cell[data-band='1'] { background: var(--amb-glow); opacity: 0.3; }
 .heat__cell[data-band='2'] { background: var(--amb-glow); opacity: 0.5; }
 .heat__cell[data-band='3'] { background: var(--amb-glow); opacity: 0.72; }
-.heat__cell[data-band='4'] { background: var(--amb-glow); opacity: 1; }
+/* The one lit thing in the chrome that was not blooming. Only the TOP band:
+   DNA §9.2's rule is a restriction, not an invitation — if every cell glowed
+   the block would be a lamp, not a record of which nights burned. */
+.heat__cell[data-band='4'] {
+  background: var(--amb-glow);
+  opacity: 1;
+  box-shadow: 0 0 var(--px2) color-mix(in oklab, var(--amb-glow) 55%, transparent);
+}
 
 /* ── Quarry rows ─────────────────────────────────────────────────────────── */
 .quarry__row { display: flex; align-items: center; gap: var(--px2); padding: var(--px) 0; }
@@ -410,7 +433,13 @@
 /* The hero size was tuned when this card was the only thing in a single row.
    In a two-row grid it has a ceiling, and `min()` against the row's own height
    is what keeps it from being the thing that overflows on a short viewport. */
-.watch__clock .digits { font-size: clamp(26px, min(4.4vw, 8.4vh), 46px); }
+.watch__clock .digits { font-size: 24px; }
+@media (min-width: 600px)  { .watch__clock .digits { font-size: 32px; } }
+@media (min-width: 900px)  { .watch__clock .digits { font-size: 40px; } }
+@media (min-width: 1400px) { .watch__clock .digits { font-size: 48px; } }
+/* Short viewports get the smaller step back: the card is a fixed grid row and
+   48px of bitmap type is what overflows it first. */
+@media (max-height: 760px) { .watch__clock .digits { font-size: 32px; } }
 .watch__side {
   flex: none;
   width: clamp(150px, 15vw, 200px);
@@ -436,4 +465,31 @@
     box-shadow: inset 0 var(--px) 0 0 var(--glass-lo);
     grid-template-columns: repeat(3, 1fr);
   }
+}
+
+/* ── Top bar ─────────────────────────────────────────────────────────────── */
+.topbar {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--px4);
+  /* Deliberately NOT a panel. Glass up here would be a second slab competing
+     with the row that is doing the work, and it would hide the sky — which is
+     the largest and most expensive surface in the picture. Text on the world,
+     with the shadow doing the separating. */
+  text-shadow: 0 var(--px) 0 rgb(0 0 0 / .7), 0 0 var(--px3) rgb(0 0 0 / .5);
+}
+.topbar__id { display: flex; flex-direction: column; gap: var(--px); min-width: 0; }
+.topbar__title {
+  font-family: var(--font-ui);
+  font-size: var(--fs-small);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--amb-ink);
+}
+.topbar__chip {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--px2);
+  flex: none;
 }

@@ -54,7 +54,11 @@ describe('every hand-written string', () => {
 
   it('keeps ambient sentences lowercase', () => {
     const labels: string[] = Object.values(COPY.labels);
-    const ambient = all.filter((l) => !labels.includes(l));
+    // The product's own name is a proper noun, not a sentence in the watchman's
+    // voice — it is what the tab, the favicon and the heading all call this
+    // thing. The rule is about the prose.
+    const exempt = new Set([...labels, COPY.title]);
+    const ambient = all.filter((l) => !exempt.has(l));
     for (const line of ambient) expect(line).toBe(line.toLowerCase());
   });
 
