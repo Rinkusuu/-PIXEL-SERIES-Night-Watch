@@ -2,6 +2,8 @@ import type { AmbientValues } from '../ambient/types';
 import type { Horizon } from './horizon';
 import { stream } from './rng';
 import { piers } from './bridge';
+import { ditherPattern } from './dither';
+import { hexToRgb } from '../ambient/interpolate';
 
 /**
  * How hard the world above is compressed as it comes back up out of the water.
@@ -134,15 +136,35 @@ export function createWater(seed = 777): Water {
       const t = motion === 0 ? 0 : timeMs / 1000;
 
       // 1 — the body. Near water is deeper and darker.
-      const body = g.createLinearGradient(0, top, 0, bot);
-      body.addColorStop(0, v.mid);
-      body.addColorStop(1, v.deep);
+      //
+      //     Dithered like the sky (DNA §9.1). The tile is four pixels wide by
+      //     the river's depth, so rebuilding it every frame is a few hundred
+      //     writes — cheap enough that the palette can keep moving at 4 Hz
+      //     without this needing a cache of its own.
       g.save();
       g.beginPath();
       g.rect(0, top, w, depth);
       g.clip();
-      g.fillStyle = body;
-      g.fillRect(0, top, w, depth);
+      const body = ditherPattern(g, depth, [
+        { at: 0, color: hexToRgb(v.mid) },
+        { at: 1, color: hexToRgb(v.deep) },
+      ]);
+      if (body) {
+        // The pattern's origin is the canvas origin, so it has to be shifted
+        // down to the waterline or the gradient starts at the top of the frame
+        // and the river is painted with the wrong slice of it.
+        g.save();
+        g.translate(0, top);
+        g.fillStyle = body;
+        g.fillRect(0, 0, w, depth);
+        g.restore();
+      } else {
+        const grad = g.createLinearGradient(0, top, 0, bot);
+        grad.addColorStop(0, v.mid);
+        grad.addColorStop(1, v.deep);
+        g.fillStyle = grad;
+        g.fillRect(0, top, w, depth);
+      }
 
       // 2 — the reflection.
       if (mirror) {

@@ -11,6 +11,7 @@ import { drawBank } from './bank';
 import { drawSky } from './sky';
 import { moonPos } from './bloom';
 import { effectsFor, type Weather } from './weather';
+import { ditherPattern } from './dither';
 
 /**
  * Engraving ink. Pushed most of the way to black so the hatching still reads
@@ -58,11 +59,27 @@ export function drawStatic(
 ): void {
   // 1 — sky. Three stops, never two (DNA §3.3). The only unhatched surface in
   //     the picture: it is the blank paper everything else is cut into.
-  const sky = g.createLinearGradient(0, 0, 0, hz.waterTop);
-  sky.addColorStop(0, v.sky[0]);
-  sky.addColorStop(0.55, v.sky[1]);
-  sky.addColorStop(1, v.sky[2]);
-  g.fillStyle = sky;
+  //     Dithered, not a browser gradient. This is the single largest soft
+  //     field in the picture, so it is the one that most decides whether the
+  //     whole thing reads as pixel art or as CSS — DNA §9.1. Built once per
+  //     plate rebuild, from a four-pixel tile: see dither.ts for why that is
+  //     the whole pattern and not an approximation of it.
+  const sky = ditherPattern(g, hz.waterTop, [
+    { at: 0, color: hexToRgb(v.sky[0]) },
+    { at: 0.55, color: hexToRgb(v.sky[1]) },
+    { at: 1, color: hexToRgb(v.sky[2]) },
+  ]);
+  if (sky) {
+    g.fillStyle = sky;
+  } else {
+    // No 2-D context for the tile (jsdom, and some privacy modes). A smooth
+    // gradient is the right fallback: wrong texture beats no sky.
+    const grad = g.createLinearGradient(0, 0, 0, hz.waterTop);
+    grad.addColorStop(0, v.sky[0]);
+    grad.addColorStop(0.55, v.sky[1]);
+    grad.addColorStop(1, v.sky[2]);
+    g.fillStyle = grad;
+  }
   g.fillRect(0, 0, w, hz.waterTop);
 
   const ink = inkFor(v);
