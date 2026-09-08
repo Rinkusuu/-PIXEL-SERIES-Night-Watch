@@ -66,6 +66,8 @@ export function App() {
             remainingMs={nw.remainingMs}
             quarryName={selected?.name ?? null}
             bloodmoon={nw.grades.includes('bloodmoon')}
+            tonight={nw.tonight}
+            weather={nw.weather}
             settings={nw.data.settings}
             settingsOpen={settingsOpen}
             onToggleSettings={() => setSettingsOpen((o) => !o)}

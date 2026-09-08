@@ -44,6 +44,7 @@ export function TheLedger({
       title="The Ledger"
       index={2}
       float
+      className="span-4"
       tools={!empty && (
         <Button onClick={() => setView((v) => (v === 'week' ? 'window' : 'week'))}>
           {view === 'week' ? COPY.ledger.toWindow : COPY.ledger.toWeek}
@@ -67,24 +68,28 @@ export function TheLedger({
         </>
       ) : (
         <>
-          {/* One cell per retained night. The column count is left to CSS — the
-              panel's width is the only thing entitled to decide it. */}
-          <div className="heat" role="img" aria-label={COPY.ledger.heatLabel(days, totals.nights)}>
-            {grid.map((n) => (
-              <i key={n.key} className="heat__cell" data-band={band(n.minutes, gridPeak)} title={`${n.key} · ${n.minutes}m`} />
-            ))}
-          </div>
-          <hr className="divider" />
-          {quarryTotals.slice(0, 4).map((q) => (
-            <div key={q.name} className="ledger__row">
-              <span className="label ledger__quarry">{q.name}</span>
-              <span className="label">{q.minutes}m</span>
+          <div className="ledger__wide">
+            <div>
+              <div className="heat" role="img" aria-label={COPY.ledger.heatLabel(days, totals.nights)}>
+                {grid.map((n) => (
+                  <i key={n.key} className="heat__cell" data-band={band(n.minutes, gridPeak)} title={`${n.key} · ${n.minutes}m`} />
+                ))}
+              </div>
+              <p className="label">
+                {COPY.ledger.best(best)} · {COPY.ledger.window(totals.minutes, totals.nights, days)}
+              </p>
             </div>
-          ))}
-          {quarryTotals.length > 0 && <hr className="divider" />}
-          <p className="label">
-            {COPY.ledger.best(best)} · {COPY.ledger.window(totals.minutes, totals.nights, days)}
-          </p>
+            <div>
+              {quarryTotals.slice(0, 5).map((q) => (
+                <div key={q.name} className="ledger__row">
+                  <span className="label ledger__quarry">{q.name}</span>
+                  <div className="ledger__bar"><Meter value={q.minutes / (quarryTotals[0]?.minutes || 1)} label={`${q.name}: ${q.minutes} menit`} /></div>
+                  <span className="label ledger__mins">{q.minutes}m</span>
+                </div>
+              ))}
+              {quarryTotals.length === 0 && <p className="label">{COPY.ledger.noQuarry}</p>}
+            </div>
+          </div>
         </>
       )}
     </Panel>

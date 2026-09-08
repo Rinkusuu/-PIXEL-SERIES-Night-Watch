@@ -29,8 +29,17 @@ export type Horizon = {
   deckTop: number;
 };
 
-/** The deck may not eat more than this much frame, nor less. */
-export const DECK_MIN = 0.54;
+/**
+ * The deck may not eat more than this much frame, nor less.
+ *
+ * `DECK_MIN` was 0.54, sized for a single row of panels. It buys the chrome its
+ * second row, and it is worth being precise about what that costs. It does NOT
+ * cost the river: at both 0.54 and 0.46 the waterline is pinned by `WATER_MIN`,
+ * so the reflection band is the same 14% of the frame either way. What pays is
+ * the sky-and-city band above it, which drops from about 35% of the frame to
+ * 26% — the towers lose roughly a quarter of their headroom.
+ */
+export const DECK_MIN = 0.46;
 export const DECK_MAX = 0.80;
 
 /** Balustrade height, as a fraction of the frame. */

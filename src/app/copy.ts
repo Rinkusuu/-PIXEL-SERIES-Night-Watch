@@ -25,13 +25,27 @@ export const COPY = {
     motion: 'gerak',
     alertNames: { title: 'JUDUL', chime: 'LONCENG', notify: 'NOTIF' },
   },
+  watch: {
+    phase: 'fase',
+    weather: 'langit',
+    night: 'malam',
+    since: 'mulai',
+    sessions: 'sesi',
+    kept: 'terkumpul',
+    clockAt: (ts: number | null) => {
+      if (ts === null) return '—';
+      const d = new Date(ts);
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    },
+  },
+  phaseName: { idle: 'diam', hunt: 'berjaga', respite: 'jeda' } as const,
+  weatherName: { clear: 'cerah', fog: 'berkabut', rain: 'hujan', fullmoon: 'purnama' } as const,
   quarry: {
     rename: 'ubah nama',
     remove: 'hapus dari daftar (riwayat tetap)',
-    renameMark: '/',
-    removeMark: '\u00d7',
   },
   ledger: {
+    noQuarry: 'belum ada buruan yang tercatat waktunya.',
     toWindow: '90 MALAM',
     toWeek: 'PEKAN',
     streak: (n: number) => `streak ${n} malam`,

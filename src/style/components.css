@@ -1,7 +1,10 @@
 .panel {
   --frame: var(--glass-edge);
   position: relative;
-  padding: var(--px4);
+  /* Tighter top and bottom than sides. The grid rows are a fixed height now,
+     so vertical padding competes directly with content; the horizontal figure
+     is what the eye actually reads as the card's margin. */
+  padding: var(--px3) var(--px4);
   isolation: isolate;
   display: flex;
   flex-direction: column;
@@ -62,14 +65,26 @@
 }
 @media (hover: hover) { .panel--float:hover { animation-play-state: running, paused; } }
 
-.panel__head { display: flex; align-items: center; gap: var(--px2); margin-bottom: var(--px3); }
+.panel__head { display: flex; align-items: center; gap: var(--px2); margin-bottom: var(--px2); }
 .panel__title {
   font-family: var(--font-ui); font-size: var(--fs-micro); font-weight: 700;
   letter-spacing: 0.16em; text-transform: uppercase; color: var(--amb-ink-soft);
   margin: 0;
 }
 .panel__tools { margin-left: auto; display: flex; gap: var(--px); }
-.panel__body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; }
+.panel__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* `safe` matters: plain `center` on an overflowing flex column pushes the
+     first line out of the scroll container's top and there is no way to scroll
+     back up to it. `safe center` centres while it fits and falls back to
+     flex-start the moment it does not. */
+  justify-content: safe center;
+  /* The row is a fixed height, so this is where overflow has to go. */
+  overflow-y: auto;
+}
 .panel__body > * { width: 100%; }
 
 .panel__spark {
@@ -208,6 +223,13 @@
 .ico[data-ico='lamp']   { clip-path: polygon(42% 0,58% 0,75% 33%,75% 58%,25% 58%,25% 33%); }
 .ico[data-ico='motion'] { clip-path: polygon(8% 42%,33% 42%,33% 17%,92% 50%,33% 83%,33% 58%,8% 58%); }
 .ico[data-ico='clock']  { clip-path: polygon(42% 8%,58% 8%,58% 46%,84% 46%,84% 62%,42% 62%); }
+/* A fader, for settings. `clock` was standing in for it and at twelve pixels
+   an hour hand and a minute hand at right angles is simply the letter L. */
+/* The knob sits OFF centre. Centred, the stem and the crossbar came out as a
+   plus sign, and a plus reads as "add" — the wrong verb for a settings button. */
+.ico[data-ico='dial']   { clip-path: polygon(42% 0,58% 0,58% 22%,92% 22%,92% 40%,58% 40%,58% 100%,42% 100%,42% 40%,8% 40%,8% 22%,42% 22%); }
+.ico[data-ico='pen']    { clip-path: polygon(70% 0,100% 30%,34% 96%,0 100%,4% 66%); }
+.ico[data-ico='cross']  { clip-path: polygon(20% 8%,50% 38%,80% 8%,92% 20%,62% 50%,92% 80%,80% 92%,50% 62%,20% 92%,8% 80%,38% 50%,8% 20%); }
 
 /* ── Content grid (DNA §6.3) ────────────────────────────────────────────── */
 .grid {
@@ -217,8 +239,24 @@
   align-content: start;
 }
 @media (min-width: 900px) {
-  .grid { grid-template-columns: repeat(4, 1fr); }
+  .grid {
+    grid-template-columns: repeat(4, 1fr);
+    /* Two rows, and tall enough that the chrome takes about 46% of the frame
+       instead of 25%. That figure is not arbitrary: `App.tsx` measures this
+       element's top edge to place the balustrade, and `horizon.ts` clamps the
+       deck to DECK_MIN. Sizing the grid so its top lands ON that clamp
+       is as much room as the composition can give the panels while the river
+       still keeps its WATER_MIN floor — past it the glass would cover the
+       parapet it is supposed to be resting on. */
+    /* A HARD height, not `minmax(..., auto)`. With `auto` the row grew with
+       its content, so opening the settings fold pushed the grid's top far
+       above DECK_MIN — the deck clamp stopped following it and the glass
+       covered the parapet and most of the river. A card that outgrows its row
+       scrolls inside itself; the composition does not move. */
+    grid-template-rows: repeat(2, clamp(150px, 24vh, 210px));
+  }
   .span-2 { grid-column: span 2; }
+  .span-4 { grid-column: span 4; }
   .row-2  { grid-row: span 2; }
 }
 
@@ -252,24 +290,37 @@
 }
 
 /* ── Ledger ──────────────────────────────────────────────────────────────── */
+/* Heat block beside the totals, so a full-width card is filled by content
+   rather than by one strip and a lot of air. Collapses to one column when the
+   card is narrow. */
+.ledger__wide { display: flex; gap: var(--px5); align-items: flex-start; flex-wrap: wrap; }
+.ledger__wide > * { flex: 1 1 300px; min-width: 0; }
+
 .ledger__row {
   display: flex;
   align-items: center;
   gap: var(--px2);
-  padding: var(--px) 0;
+  /* No vertical padding: seven of these plus a footer have to fit one grid
+     row, and the gap between bars is already doing the separating. */
+  padding: 1px 0;
 }
 .ledger__day { width: 5.5em; flex: none; }
+.ledger__bar { flex: 1; min-width: 0; }
+.ledger__mins { flex: none; width: 4em; text-align: right; }
 /* Long task names truncate rather than wrap: a two-line row would break the
    rhythm the rest of the panel is built on. */
 .ledger__quarry { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* One cell per retained night. `auto-fill` rather than a fixed column count —
-   the panel's own width decides how the ninety nights wrap, which is why the
-   grid is handed to the view as a flat run and not pre-laid-out. */
+/* One cell per retained night, in a fixed THIRTY columns — roughly a month a
+   row. `auto-fill` was tried first and is wrong on a wide card: a hundred and
+   fifty columns of space lays all ninety nights out in a single strip, and a
+   strip is a timeline, not a calendar. The block is what lets the eye compare
+   one week against the one above it. */
 .heat {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(7px, 1fr));
+  grid-template-columns: repeat(30, 1fr);
   gap: 2px;
+  max-width: 460px;
   margin: var(--px) 0 var(--px2);
 }
 .heat__cell {
@@ -286,7 +337,8 @@
 
 /* ── Quarry rows ─────────────────────────────────────────────────────────── */
 .quarry__row { display: flex; align-items: center; gap: var(--px2); padding: var(--px) 0; }
-.quarry__mins { margin-left: auto; flex: none; }
+.quarry__bar { flex: 1; min-width: 0; margin-left: var(--px2); }
+.quarry__mins { flex: none; width: 4em; text-align: right; }
 .quarry__edit { flex: 1; display: flex; }
 .quarry__input {
   flex: 1; min-width: 0; border: 0; color: var(--amb-ink);
@@ -304,4 +356,62 @@
   padding: 0 var(--px2);
   min-width: 0;
   line-height: 1;
+}
+
+/* ── Stat: label over value ──────────────────────────────────────────────── */
+.stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.stat__label {
+  font-family: var(--font-ui);
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--amb-ink-soft);
+}
+.stat__value {
+  font-family: var(--font-ui);
+  font-size: var(--fs-small);
+  color: var(--amb-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The rare accents from addendum §D. They were declared in tokens.css and used
+   nowhere, so every value in the chrome was the same ink — which is exactly
+   what makes a dense card read as a wall of text rather than as an instrument.
+   Sparingly: a card where every value is accented has no accent. */
+.stat__value[data-tone='glow']  { color: var(--amb-glow); }
+.stat__value[data-tone='brass'] { color: var(--acc-brass); }
+.stat__value[data-tone='dusk']  { color: var(--acc-dusk); }
+.stat__value[data-tone='blood'] { color: var(--acc-blood); }
+
+.watch { display: flex; gap: var(--px5); align-items: stretch; flex: 1; min-height: 0; }
+/* Two columns of stats on a wide card, one on a narrow one. */
+/* The clock sits at the top of its column and the controls at the bottom, so a
+   card twice as tall as before does not simply grow a void under the buttons. */
+.watch__main {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; justify-content: space-between; gap: var(--px3);
+}
+/* The stat column takes a fixed share rather than growing: a column that grows
+   with the card ends up with a metre of air between label and value on a wide
+   screen. */
+/* Tight. The card is a fixed grid row now, so every pixel of gap here is a
+   pixel the controls at its foot do not get — and clipped buttons are a worse
+   failure than a snug clock. Measured: the block overflowed its body by 24px
+   at `--px2`, and by nothing at `--px`. */
+.watch__clock { display: flex; flex-direction: column; gap: var(--px); }
+/* The hero size was tuned when this card was the only thing in a single row.
+   In a two-row grid it has a ceiling, and `min()` against the row's own height
+   is what keeps it from being the thing that overflows on a short viewport. */
+.watch__clock .digits { font-size: clamp(26px, min(4.4vw, 8.4vh), 46px); }
+.watch__side {
+  flex: none;
+  width: clamp(150px, 15vw, 200px);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--px3) var(--px2);
+  align-content: start;
+  padding-left: var(--px4);
+  box-shadow: inset var(--px) 0 0 0 var(--glass-lo);
 }

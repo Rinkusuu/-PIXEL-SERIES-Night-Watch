@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Button } from '../components/Button';
+import { Ico } from '../components/Ico';
+import { Meter } from '../components/Meter';
 import { Panel } from '../components/Panel';
 import { COPY } from '../app/copy';
 import type { Quarry } from '../store/schema';
@@ -19,10 +21,11 @@ export function TheQuarry({
   // Which row is being renamed, and the text so far. One at a time: two open
   // editors in a list this small is a way to lose the one you meant to keep.
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
+  const peak = Math.max(0, ...quarry.map((q) => q.minutes));
 
   // NOT floating: you cannot hit a moving target. DNA §8.5.
   return (
-    <Panel title="The Quarry" index={1}>
+    <Panel title="The Quarry" index={1} className="span-2">
       <form
         onSubmit={(e) => { e.preventDefault(); onAdd(draft); setDraft(''); }}
         style={{ display: 'flex', gap: 'var(--px2)' }}
@@ -78,6 +81,12 @@ export function TheQuarry({
                     >
                       <span style={{ textDecoration: q.done ? 'line-through' : 'none' }}>{q.name}</span>
                     </Button>
+                    {/* The bar is what stops a wide card from being a name at
+                        one edge and a number at the other with a metre of air
+                        between them — and it ranks the list at a glance. */}
+                    <div className="quarry__bar">
+                      <Meter value={peak === 0 ? 0 : q.minutes / peak} label={`${q.name}: ${q.minutes} menit`} />
+                    </div>
                     <span className="label quarry__mins">{q.minutes}m</span>
                     <div className="quarry__tools">
                       <button
@@ -86,14 +95,14 @@ export function TheQuarry({
                         onClick={() => setEditing({ id: q.id, text: q.name })}
                         aria-label={`ubah nama: ${q.name}`}
                         title={COPY.quarry.rename}
-                      >{COPY.quarry.renameMark}</button>
+                      ><Ico name="pen" /></button>
                       <button
                         type="button"
                         className="btn btn--bare"
                         onClick={() => onRemove(q.id)}
                         aria-label={`hapus: ${q.name}`}
                         title={COPY.quarry.remove}
-                      >{COPY.quarry.removeMark}</button>
+                      ><Ico name="cross" /></button>
                     </div>
                     <input
                       type="checkbox"

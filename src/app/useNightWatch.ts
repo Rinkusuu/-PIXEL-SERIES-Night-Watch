@@ -70,6 +70,20 @@ export function useNightWatch() {
   const remainingMs = remainingOf(session, now);
   const selectedName = data.quarry.find((q) => q.id === session.quarryId)?.name ?? null;
 
+  // What tonight itself has amounted to so far. The Watch had a clock and four
+  // hundred pixels of nothing beside it; these are the facts that were already
+  // in the store and were never shown anywhere.
+  const tonightStats = useMemo(() => {
+    const key = nightKey(now);
+    const mine = data.sessions.filter((s) => nightKey(s.startedAt) === key);
+    return {
+      key,
+      count: mine.length,
+      minutes: mine.reduce((sum, s) => sum + s.minutes, 0),
+      startedAt: session.startedAt,
+    };
+  }, [data.sessions, now, session.startedAt]);
+
   const grades = useMemo<GradeName[]>(() => {
     const g: GradeName[] = [];
     if (session.phase === 'hunt' && remainingMs <= PRESSED_MS) g.push('pressed');
@@ -297,6 +311,7 @@ export function useNightWatch() {
   return {
     session, values, progress, motion, grades, data, remainingMs, streak, ledger, weather,
     nightsGrid, best, totals, quarryTotals, retentionDays: RETENTION_DAYS,
+    tonight: tonightStats,
     recovered: boot.recovered, actions,
   };
 }
