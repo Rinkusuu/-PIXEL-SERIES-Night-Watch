@@ -272,9 +272,29 @@
 
 /* A list that may grow without shoving the parapet off the bottom of the world. */
 .list--scroll {
+  /* The list is clipped by the panel's own fixed grid row, not by this — the
+     `max-height` only stops it fighting for space before it gets there. What
+     matters is the EDGE: a row cut in half at the bottom of a card is the
+     single most "broken-looking" thing a list can do, and there was nothing
+     saying the cut was deliberate.
+     So the last few pixels dissolve through the same Bayer-ordered mask the
+     rest of the picture is dithered with (DNA §9.1's no-canvas variant) — the
+     row does not end, it CRUMBLES, which reads as "there is more" instead of
+     as a rendering fault. Fades out only; the top edge stays hard. */
   max-height: 168px;
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* Four hard 4px steps, not a smooth ramp and not a conic checker. A smooth
+     ramp is the gradient DNA §9.1 forbids; a 2x2 conic checker is the periodic
+     LATTICE it warns about by name, which hardens rather than dissolves. Bands
+     on the same 4px grid as everything else quantise the edge honestly. */
+  --mask-steps: #000 calc(100% - 16px),
+    rgb(0 0 0 / .72) calc(100% - 16px), rgb(0 0 0 / .72) calc(100% - 12px),
+    rgb(0 0 0 / .44) calc(100% - 12px), rgb(0 0 0 / .44) calc(100% - 8px),
+    rgb(0 0 0 / .18) calc(100% - 8px),  rgb(0 0 0 / .18) calc(100% - 4px),
+    transparent calc(100% - 4px);
+  mask-image: linear-gradient(to bottom, var(--mask-steps));
+  -webkit-mask-image: linear-gradient(to bottom, var(--mask-steps));
 }
 
 /* ── Settings, folded into The Watch ─────────────────────────────────────── */

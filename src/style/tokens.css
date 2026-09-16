@@ -37,7 +37,18 @@
   --glass-bg: color-mix(in oklab, var(--amb-deep) 86%, transparent);
   --glass-hi: color-mix(in oklab, #ffffff 14%, transparent);
   --glass-lo: color-mix(in oklab, #000000 30%, transparent);
-  --glass-edge: color-mix(in oklab, var(--amb-mid) 88%, #000 12%);
+  /* The notched ring — DNA §5.1 calls it the single most important marker of
+     this whole language, and it has never once been visible.
+     It was `--amb-mid` pulled 12% toward black. That derivation was written
+     against the parent project's DAYTIME palette, where `--amb-mid` (#3e4a57)
+     sits well above `--amb-deep` (#2d3038). This app's palette is a night: the
+     two roles land on nearly the same value, so a ring darker than `mid` came
+     out at 1.00–1.04:1 against the panel it is supposed to outline — measured
+     at every keyframe, in every grade. Not faint. Indistinguishable.
+     Mixing toward `accent` instead — the fog, the brightest mass in the
+     picture (addendum §D.1) — puts it at 1.7–3.3:1 across the night, and keeps
+     it cool, so `glow` stays the only warm colour in the app. */
+  --glass-edge: color-mix(in oklab, var(--amb-accent) 70%, var(--amb-mid));
   --glass-blur: 18px;
 
   /* Pixel geometry */
