@@ -183,10 +183,13 @@ describe('the moon carries the picture', () => {
     const clear = draw('clear');
     const fog = draw('fog');
 
-    // Two blobs for the moon: corona first, then the tight halo.
-    expect(clear.radii.length).toBe(2);
-    expect(clear.radii[0]).toBeGreaterThan(clear.radii[1]!);
-    expect(clear.alphas[0]).toBeLessThan(clear.alphas[1]!);
+    // ONE blob for the moon now, and that is the point. The tight halo and the
+    // disc moved to `sky.ts`, onto the plate, so the city can stand in front of
+    // them; drawn in this pass they sat on top of the finished picture and the
+    // moon floated in front of the buildings. What is left here is the wide
+    // corona, which belongs in front — it is moisture in the air between you
+    // and everything else.
+    expect(clear.radii.length).toBe(1);
     // And it grows in the fog.
     expect(fog.radii[0]).toBeGreaterThan(clear.radii[0]!);
   });

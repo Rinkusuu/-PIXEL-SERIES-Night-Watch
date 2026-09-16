@@ -145,7 +145,7 @@ export function lampSpots(
     // The moon is the picture's key light, not a decoration in the corner. At
     // r16 it read as a sticker; this is the size it has to be to justify the
     // reflection column it drops down the whole river.
-    x: Math.round(moon.x), y: Math.round(moon.y), r: 30 * fx.moonScale,
+    x: Math.round(moon.x), y: Math.round(moon.y), r: MOON_BASE_R * fx.moonScale,
     lit: true, kind: 'moon',
   });
 
@@ -172,7 +172,14 @@ function glowBlob(
  * reason: it is the TOP of the value range, and a top that drifts with the
  * ambient palette is not a top.
  */
-const MOON_DISC = '#f4f7f4';
+export const MOON_DISC = '#f4f7f4';
+
+/**
+ * The moon's radius before the weather scales it. Shared with `sky.ts`, which
+ * draws the body onto the plate so the skyline can stand in front of it — two
+ * copies of this number is a disc and a halo of different sizes.
+ */
+export const MOON_BASE_R = 30;
 
 const HALO: Record<LampSpot['kind'], number> = {
   window: 8, bridge: 12, street: 15, lantern: 20, moon: 3.6,
@@ -199,23 +206,19 @@ export function drawLamps(
     const rad = s.r * pulse;
 
     if (s.kind === 'moon') {
-      // The corona is moisture, not light. It swells with the fog and all but
-      // vanishes on the clearest night, which ties the weather to the moon
-      // without adding a knob for it. Drawn FIRST so the tight halo and the
-      // hard disc sit on top of it.
+      // ONLY the wide corona is left here. The disc and its tight halo moved to
+      // `sky.ts`, onto the plate, because drawn in this pass they sat on top of
+      // the finished picture and the moon floated in front of the city.
+      //
+      // This one belongs in front: it is moisture in the air between you and
+      // everything else, so it genuinely does wash over the near buildings. It
+      // swells with the fog and all but vanishes on the clearest night, which
+      // ties the weather to the moon without adding a knob for it.
       glowBlob(
         g, s.x, s.y,
         rad * HALO.moon * 2.6 * (0.6 + fx.fogScale * 0.5),
         v.glow, 0.05 + fx.fogScale * 0.05,
       );
-      glowBlob(g, s.x, s.y, rad * HALO.moon, v.glow, ALPHA.moon + v.lum * 0.1 + fx.lumLift);
-      // A hard, near-white disc. A soft dim one reads as a smudge, and the
-      // reference's moon is the brightest thing on screen by a wide margin.
-      g.globalAlpha = Math.min(1, 0.62 + v.lum * 0.3 + fx.lumLift);
-      g.fillStyle = MOON_DISC;
-      g.beginPath();
-      g.arc(s.x, s.y, rad, 0, Math.PI * 2);
-      g.fill();
       continue;
     }
 

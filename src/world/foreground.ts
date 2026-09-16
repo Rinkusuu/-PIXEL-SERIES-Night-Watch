@@ -1,5 +1,4 @@
 import type { Horizon } from './horizon';
-import { stream } from './rng';
 
 /**
  * The near vignette — the thing the scene was missing.
@@ -211,57 +210,21 @@ function railFinials(g: CanvasRenderingContext2D, w: number, hz: Horizon): void 
   }
 }
 
-/**
- * Overhanging branches at the two top corners.
+/*
+ * Overhanging branches used to live here and have been removed.
  *
- * Every number here used to be fixed: three limbs at 4, 30 and 56, reaching
- * 130, 96 and 62, with two twigs on each at t = 0.4 and t = 0.72 — the same on
- * the left as on the right, every night, at every size. Two mirrored copies of
- * one diagram is what the eye actually notices, because a tree is the one thing
- * in the picture it has a lifetime of experience being irregular.
+ * They were the only part of the vignette drawn as STROKES rather than filled
+ * blocks, and the only part that was not a near-black vertical — the addendum's
+ * frame is a gas standard, spear-topped railings and stone gate piers, all of
+ * them uprights. Thin diagonal lines with short diagonal twigs, at 45% alpha
+ * over the one clean surface in the picture, did not read as boughs. They read
+ * as a cobweb in the corner of the screen, or as scratches on the glass, and
+ * they crossed a third of the sky to do it.
  *
- * Seeded from the frame rather than from `nightKey()` on purpose. These are the
- * shape of the place you stand in, not the weather: the same window should show
- * the same tree all week, and a resize is already allowed to reshape the
- * skyline for the same reason.
+ * The frame does not need them: three uprights already close all four edges.
+ * Kept as a note rather than as dead code, because "add branches" is the kind
+ * of idea that comes back.
  */
-function branches(g: CanvasRenderingContext2D, w: number, hz: Horizon): void {
-  const r = stream(Math.round(w * 41 + hz.h));
-  g.lineWidth = 2;
-  for (const side of [0, 1]) {
-    const rootX = side === 0 ? -6 : w + 6;
-    const dir = side === 0 ? 1 : -1;
-    const limbs = 3 + Math.floor(r() * 2);
-    for (let b = 0; b < limbs; b++) {
-      const dropY = 4 + b * 26 + Math.round(r() * 18);
-      const reach = 130 - b * 34 + Math.round(r() * 46);
-      // Droop varies per limb too: limbs that all bend on one curve read as a
-      // rake, and the twigs inherit it so a twig never leaves its own branch.
-      const droop = hz.cityTop * (0.42 + r() * 0.3);
-      g.beginPath();
-      g.moveTo(rootX, dropY);
-      g.quadraticCurveTo(
-        rootX + dir * reach * 0.5, dropY + droop * 0.4,
-        rootX + dir * reach, dropY + droop,
-      );
-      g.stroke();
-      for (let k = 0; k < 2 + Math.floor(r() * 2); k++) {
-        const t = 0.3 + r() * 0.55;
-        const tx = rootX + dir * reach * t;
-        const ty = dropY + droop * t * t;
-        const len = 11 + r() * 12;
-        g.beginPath();
-        g.moveTo(tx, ty);
-        // Twigs go UP off the limb, always. A branch hanging into frame from
-        // above is being pulled down by its own weight; its twigs are the part
-        // that has not been pulled down yet, and one drawn downward reads as a
-        // break rather than as growth.
-        g.lineTo(tx + dir * len, ty - len * (0.6 + r() * 0.6));
-        g.stroke();
-      }
-    }
-  }
-}
 
 export function drawForeground(
   g: CanvasRenderingContext2D,
@@ -284,9 +247,6 @@ export function drawForeground(
 
   g.globalAlpha = 0.92;
   railFinials(g, w, hz);
-
-  g.globalAlpha = 0.45;
-  branches(g, w, hz);
 
   g.restore();
 }

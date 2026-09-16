@@ -134,8 +134,8 @@ describe('drawSky', () => {
   it('draws stars on a clear night and none in the fog', () => {
     const clear = countingCtx();
     const foggy = countingCtx();
-    drawSky(clear.g, 1440, hz, v, blocks, moon, effectsFor('clear').fogScale, '#0a0e10', 31);
-    drawSky(foggy.g, 1440, hz, v, blocks, moon, effectsFor('fog').fogScale, '#0a0e10', 31);
+    drawSky(clear.g, 1440, hz, v, blocks, moon, 30, effectsFor('clear').fogScale, '#0a0e10', 31);
+    drawSky(foggy.g, 1440, hz, v, blocks, moon, 30, effectsFor('fog').fogScale, '#0a0e10', 31);
     expect(clear.calls()).toBeGreaterThan(foggy.calls());
   });
 
@@ -153,7 +153,7 @@ describe('drawSky', () => {
     // buried in the middle. Nothing in the world layer strokes at all now —
     // a one-pixel line is what stopped this reading as pixel art.
     const c = countingCtx();
-    drawSky(c.g, 1440, hz, v, blocks, moon, 1, '#0a0e10', 31);
+    drawSky(c.g, 1440, hz, v, blocks, moon, 30, 1, '#0a0e10', 31);
     expect(c.strokes()).toBe(0);
   });
 
@@ -169,7 +169,7 @@ describe('drawSky', () => {
       },
       set: () => true,
     });
-    drawSky(g, 1440, hz, v, blocks, moon, 1, '#0a0e10', 31);
+    drawSky(g, 1440, hz, v, blocks, moon, 30, 1, '#0a0e10', 31);
     expect(grads).toBe(cloudBanks(1440, hz, 31 + 991).length);
   });
 
@@ -187,8 +187,10 @@ describe('drawSky', () => {
       },
       set: () => true,
     });
-    drawSky(g, 1440, hz, v, blocks, moon, 1, '#0a0e10', 31);
-    // One per bank, and none for the dome or the stars, which are fillRects.
-    expect(fills).toBe(cloudBanks(1440, hz, 31 + 991).length);
+    drawSky(g, 1440, hz, v, blocks, moon, 30, 1, '#0a0e10', 31);
+    // One per bank, plus the moon's two: its tight halo and its disc, which
+    // live on the plate so the skyline can occlude them. The dome and the
+    // stars are fillRects and do not count.
+    expect(fills).toBe(cloudBanks(1440, hz, 31 + 991).length + 2);
   });
 });

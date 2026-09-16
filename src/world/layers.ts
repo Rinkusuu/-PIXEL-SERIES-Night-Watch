@@ -9,7 +9,7 @@ import { valueLadder } from './ladder';
 import { drawWatcher } from './figure';
 import { drawBank } from './bank';
 import { drawSky } from './sky';
-import { moonPos } from './bloom';
+import { MOON_BASE_R, moonPos } from './bloom';
 import { effectsFor, type Weather } from './weather';
 import { ditherPattern } from './dither';
 
@@ -90,9 +90,10 @@ export function drawStatic(
   //      banks, in that order back to front. The moon's position comes from
   //      bloom.ts rather than a second guess here: the clouds are lit from it,
   //      and a rim on the wrong side is worse than no rim.
+  const fx = effectsFor(weather);
   drawSky(
-    g, w, hz, v, blocks, moonPos(w, hz, progress),
-    effectsFor(weather).fogScale, ink, Math.round(w * 13 + hz.h),
+    g, w, hz, v, blocks, moonPos(w, hz, progress), MOON_BASE_R * fx.moonScale,
+    fx.fogScale, ink, Math.round(w * 13 + hz.h),
   );
 
   // 2 — the band BEHIND the skyline. Its own seed, so its towers land between

@@ -29,6 +29,17 @@ const REDRAW_THRESHOLD = 6;
 /** The deck may jitter by a pixel or two as panels reflow; ignore that. */
 const DECK_THRESHOLD = 4;
 
+/**
+ * How far the moon may travel before the plate is rebuilt.
+ *
+ * The moon's body lives on the plate now, so the city can stand in front of it
+ * — which means a plate that never rebuilds shows a moon frozen where it rose.
+ * It climbs roughly a hundred pixels over a whole session, so at three pixels
+ * this adds about thirty rebuilds an hour, against the palette drift that
+ * already triggers them several times a minute.
+ */
+const MOON_THRESHOLD = 3;
+
 export type FrameInput = {
   w: number;
   h: number;
@@ -51,6 +62,7 @@ export function createWorldRenderer() {
   let cachedH = 0;
   let cachedDeck = -999;
   let cachedWeather: Weather | null = null;
+  let cachedMoonY = -999;
 
   const water = createWater();
   const clock = createFrameClock();
@@ -72,7 +84,8 @@ export function createWorldRenderer() {
       cachedH !== h ||
       cachedWeather !== weather ||
       Math.abs(cachedDeck - hz.deckTop) > DECK_THRESHOLD ||
-      channelDrift(cachedMid, v.mid) > REDRAW_THRESHOLD;
+      channelDrift(cachedMid, v.mid) > REDRAW_THRESHOLD ||
+      Math.abs(cachedMoonY - moonPos(w, hz, progress).y) > MOON_THRESHOLD;
 
     if (stale) {
       // The skyline only regenerates on a size change. A city that reshuffles
@@ -118,6 +131,7 @@ export function createWorldRenderer() {
       cachedH = h;
       cachedDeck = hz.deckTop;
       cachedWeather = weather;
+      cachedMoonY = moonPos(w, hz, progress).y;
     }
 
     const notch = clock.notch();
