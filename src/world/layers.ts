@@ -101,7 +101,7 @@ export function drawStatic(
   //     signal of "further away" is that it is closer to the fog's own value.
   //     Generated here rather than in the renderer because nothing outside the
   //     plate ever needs it — only the near band feeds smoke its chimneys.
-  const far = skyline(w, hz.cityTop, hz.cityBot, Math.round(w * 17 + hz.h), FAR_SCALE);
+  const far = skyline(w, hz.cityTopFar, hz.cityBot, Math.round(w * 17 + hz.h), FAR_SCALE);
   drawSkyline(g, far, hz.cityBot, {
     fill: ladder.cityFar,
     ink,
@@ -118,7 +118,7 @@ export function drawStatic(
   //      of the other two bands' gaps by accident. Openings yes, details no: at
   //      0.78 a window is still a window, but a crocket is four pixels and at
   //      that scale a band of them reads as grit.
-  const mid = skyline(w, hz.cityTop, hz.cityBot, Math.round(w * 23 + hz.h), MID_SCALE);
+  const mid = skyline(w, hz.cityTopMid, hz.cityBot, Math.round(w * 23 + hz.h), MID_SCALE);
   drawSkyline(g, mid, hz.cityBot, {
     fill: ladder.cityMid,
     ink,

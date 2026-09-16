@@ -12,8 +12,21 @@
  */
 export type Horizon = {
   h: number;
-  /** highest spire in the far city */
+  /** highest spire in the NEAR city band */
   cityTop: number;
+  /**
+   * Ceilings for the two bands behind it.
+   *
+   * All three bands used to be generated between `cityTop` and `cityBot`, so
+   * the furthest skyline reached exactly as high as the nearest one. That is
+   * not what distance does: a city further away sits LOWER in the frame,
+   * closer to the horizon, and its tallest towers stop short of the near
+   * ones'. Sharing one ceiling is most of why the three bands read as a single
+   * mush instead of as three distances — the value ladder was doing all the
+   * work of separating them and getting no help from the silhouette.
+   */
+  cityTopMid: number;
+  cityTopFar: number;
   /** below this the city's roofs begin; above it the sky is clean */
   skyBot: number;
   /** the far city's feet — the same line as the waterline */
@@ -88,6 +101,11 @@ export function horizon(h: number, deckTopPx: number): Horizon {
     // is reached by a handful of towers and the rest of the band sits well
     // under it. Grandeur is the gap between the two, and the gap needs room.
     cityTop: Math.round(above * 0.30),
+    // Measured down from the near band's ceiling, as a share of the band's own
+    // height — so the three stay in proportion at any viewport rather than
+    // converging when the band is short.
+    cityTopMid: Math.round(above * 0.30 + (waterTop - above * 0.30) * 0.16),
+    cityTopFar: Math.round(above * 0.30 + (waterTop - above * 0.30) * 0.34),
     skyBot: Math.round(above * 0.55),
     cityBot: waterTop,
     // Close to the waterline on purpose. A distant bridge is a THIN band; give
