@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { horizon } from '../../src/world/horizon';
 import {
   RING_LIMIT, advanceRing, createWater, mirrorRow, reflectAlpha, rowWobble,
+  stoneSkip,
 } from '../../src/world/water';
 
 describe('mirrorRow', () => {
@@ -134,5 +136,61 @@ describe('motion: 0 freezes the river without emptying it', () => {
 
   it('but does move when motion is on', () => {
     expect(frameAt(0, 1)).not.toBe(frameAt(5_000, 1));
+  });
+});
+
+describe('stoneSkip', () => {
+  const hz = horizon(900, Math.round(900 * 0.6));
+
+  it('refuses a throw that never reached the water', () => {
+    // Sky and stone. A stone thrown at a building did not skip, and saying so
+    // is better than quietly rippling somewhere the pointer never was.
+    expect(stoneSkip(700, hz.waterTop - 40, hz, 0)).toEqual([]);
+    expect(stoneSkip(700, hz.waterBot + 40, hz, 0)).toEqual([]);
+  });
+
+  it('bounces at least once anywhere on the river', () => {
+    for (const f of [0, 0.25, 0.5, 0.75, 1]) {
+      const y = hz.waterTop + (hz.waterBot - hz.waterTop) * f;
+      expect(stoneSkip(700, y, hz, 0).length, `f=${f}`).toBeGreaterThan(0);
+    }
+  });
+
+  it('gives a flatter throw more bounces than a steep one', () => {
+    // Near water is closer to you; the far bank is a long throw at a bad angle.
+    const near = stoneSkip(700, hz.waterBot - 2, hz, 0).length;
+    const far = stoneSkip(700, hz.waterTop + 2, hz, 0).length;
+    expect(near).toBeGreaterThan(far);
+  });
+
+  it('carries the stone upstream and away, never backwards', () => {
+    const hits = stoneSkip(400, hz.waterBot - 4, hz, 0.9);
+    expect(hits.length).toBeGreaterThan(2);
+    for (let i = 1; i < hits.length; i++) {
+      expect(hits[i]!.x, 'x must advance').toBeGreaterThan(hits[i - 1]!.x);
+      expect(hits[i]!.y, 'y must rise toward the far bank').toBeLessThan(hits[i - 1]!.y);
+    }
+  });
+
+  it('never leaves a ring above the waterline', () => {
+    // The bank is not water. A ring drawn there is a ripple in a wall.
+    for (const f of [0.1, 0.4, 0.9]) {
+      const y = hz.waterTop + (hz.waterBot - hz.waterTop) * f;
+      for (const p of stoneSkip(700, y, hz, 1)) {
+        expect(p.y).toBeGreaterThanOrEqual(hz.waterTop);
+      }
+    }
+  });
+
+  it('fades each bounce weaker than the one before it', () => {
+    const hits = stoneSkip(400, hz.waterBot - 4, hz, 0.9);
+    for (let i = 1; i < hits.length; i++) {
+      expect(hits[i]!.strength).toBeLessThan(hits[i - 1]!.strength);
+    }
+  });
+
+  it('is deterministic when the roll is given', () => {
+    expect(stoneSkip(700, hz.waterTop + 30, hz, 0.42))
+      .toEqual(stoneSkip(700, hz.waterTop + 30, hz, 0.42));
   });
 });

@@ -48,7 +48,8 @@ export function App() {
 
   useEffect(() => {
     document.documentElement.dataset.zen = zen ? 'on' : 'off';
-  }, [zen]);
+    if (zen) nw.actions.note('dark');
+  }, [zen, nw.actions]);
 
   useEffect(() => {
     document.documentElement.style.setProperty('--grain-uri', makeGrainUri());
@@ -97,6 +98,7 @@ export function App() {
         weather={nw.weather}
         deckTop={deckTop}
         zen={zen}
+        onSkip={(bounces) => { if (bounces >= 5) nw.actions.note('stone'); }}
       />
       <main className="app">
         {/* The page had three h2 panels and nothing above them, so a screen
@@ -149,6 +151,7 @@ export function App() {
             best={nw.best}
             totals={nw.totals}
             days={nw.retentionDays}
+            notes={nw.data.notes}
             view={ledgerWide ? 'window' : 'week'}
             onToggleView={() => setLedgerWide((o) => !o)}
           />

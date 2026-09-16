@@ -68,6 +68,46 @@ export function advanceRing(r: Ring, dtMs: number): Ring {
   return { ...r, life, r: r.r + dt * 34 * Math.pow(decay, 0.6) };
 }
 
+/** How far a skimmed stone carries between its first two bounces, in pixels. */
+const STONE_STEP = 16;
+
+/**
+ * Where a stone thrown at `(x, y)` touches the water.
+ *
+ * Pure, and it lives here because the ring field lives here — the module that
+ * owns the thing owns what you can do to the thing. A caller computing bounce
+ * positions itself would need its own copy of where the river is, which is a
+ * second truth about the water that is wrong the moment the horizon moves.
+ *
+ * Returns an empty list for a throw that never reached the river. Saying so is
+ * better than quietly rippling somewhere the pointer never was.
+ */
+export function stoneSkip(
+  x: number, y: number, hz: Horizon, roll = Math.random(),
+): { x: number; y: number; strength: number }[] {
+  if (y < hz.waterTop || y > hz.waterBot) return [];
+
+  const depth = Math.max(1, hz.waterBot - hz.waterTop);
+  // Nearer water is closer to you, so a flatter throw gets more bounces. The
+  // curve is deliberately generous: this is meant to be a nice thing to do with
+  // a hand, not a test of aim.
+  const d = (y - hz.waterTop) / depth;
+  const bounces = 1 + Math.floor(d * 4 + roll * 1.4);
+
+  const out: { x: number; y: number; strength: number }[] = [];
+  let bx = x;
+  let by = y;
+  for (let i = 0; i < bounces; i++) {
+    out.push({ x: bx, y: by, strength: 1 - i / (bounces + 1) });
+    // Each bounce carries further and lands shallower — upstream, away from
+    // you, which is the direction a skimmed stone actually travels.
+    bx += STONE_STEP * (1 - i / bounces) + 6;
+    by -= depth * 0.06 * (1 - i / bounces);
+    if (by < hz.waterTop) break;
+  }
+  return out;
+}
+
 export type Water = {
   /** Rain, the barge's bow wave, and the ripple field all call THIS. */
   ring(x: number, y: number, strength?: number): void;

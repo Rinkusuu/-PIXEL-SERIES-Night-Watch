@@ -45,7 +45,10 @@ export function load(storage: Storage = localStorage): { data: Schema; recovered
   const base = emptySchema();
   const settings = { ...base.settings, ...(parsed.settings ?? {}) };
   settings.alerts = { ...base.settings.alerts, ...(settings.alerts ?? {}) };
-  return { data: { ...parsed, settings }, recovered: false };
+  // Same repair for `notes`: a store written before they existed has none, and
+  // every reader expects an array.
+  const notes = Array.isArray(parsed.notes) ? parsed.notes : [];
+  return { data: { ...parsed, settings, notes }, recovered: false };
 }
 
 export function save(

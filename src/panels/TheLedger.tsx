@@ -2,6 +2,7 @@ import { Button } from '../components/Button';
 import { Meter } from '../components/Meter';
 import { Panel } from '../components/Panel';
 import { COPY } from '../app/copy';
+import { noteText } from '../session/notes';
 
 /**
  * Five bands of ink, zero included.
@@ -23,7 +24,7 @@ function band(minutes: number, peak: number): number {
 }
 
 export function TheLedger({
-  rows, grid, quarryTotals, streak, best, totals, days, view, onToggleView,
+  rows, grid, quarryTotals, streak, best, totals, days, notes, view, onToggleView,
 }: {
   rows: readonly { key: string; minutes: number }[];
   grid: readonly { key: string; minutes: number }[];
@@ -32,6 +33,7 @@ export function TheLedger({
   best: number;
   totals: { minutes: number; nights: number };
   days: number;
+  notes: readonly string[];
   /** Lifted, so the palette can switch it too — one source, not two. */
   view: 'week' | 'window';
   onToggleView: () => void;
@@ -81,6 +83,16 @@ export function TheLedger({
               </p>
             </div>
             <div>
+              {/* What the watch saw, newest last. No badge, no toast, no
+                  count against a total — a total would turn a logbook into a
+                  checklist, and then the point of the thing is collecting it. */}
+              {notes.length > 0 && (
+                <ul className="notes">
+                  {notes.slice(-4).map((id) => (
+                    <li key={id} className="label notes__line">{noteText(id)}</li>
+                  ))}
+                </ul>
+              )}
               {quarryTotals.slice(0, 5).map((q) => (
                 <div key={q.name} className="ledger__row">
                   <span className="label ledger__quarry">{q.name}</span>

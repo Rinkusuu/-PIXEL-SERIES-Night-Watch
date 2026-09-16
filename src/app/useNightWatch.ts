@@ -12,6 +12,7 @@ import {
   bestStreak, minutesByNight, minutesByQuarry, nightGrid, windowTotals,
 } from '../session/aggregate';
 import { streakLength } from '../session/streak';
+import { notesForWatch, record } from '../session/notes';
 import { load, save } from '../store/persist';
 import { RETENTION_DAYS } from '../store/schema';
 import type { Schema } from '../store/schema';
@@ -93,6 +94,11 @@ export function useNightWatch() {
 
   // Read by the heartbeat below, which is mounted once and would otherwise
   // close over the settings as they were at boot.
+  // Read inside the heartbeat, which is mounted once and would otherwise close
+  // over tonight's weather as it was at boot.
+  const weatherRef = useRef<Weather>(weather);
+  weatherRef.current = weather;
+
   const alertsRef = useRef<Alerts>(data.settings.alerts);
   alertsRef.current = data.settings.alerts;
 
@@ -116,9 +122,19 @@ export function useNightWatch() {
       }
       if (completed) {
         setData((d) => {
+          const sessions = [...d.sessions, completed];
           const next: Schema = {
             ...d,
-            sessions: [...d.sessions, completed],
+            sessions,
+            // The phase ran out on its own, so the watch was KEPT rather than
+            // ended — that is the one note the two completion paths disagree on.
+            notes: record(d.notes, notesForWatch({
+              minutes: completed.minutes,
+              completed: true,
+              weather: weatherRef.current,
+              streak: streakLength(sessions, at),
+              totalSessions: sessions.length,
+            })),
             quarry: d.quarry.map((q) =>
               q.id === completed.quarryId ? { ...q, minutes: q.minutes + completed.minutes } : q,
             ),
@@ -166,9 +182,19 @@ export function useNightWatch() {
       const { state, completed } = reduce(s, ev);
       if (completed) {
         setData((d) => {
+          const now2 = Date.now();
+          const sessions = [...d.sessions, completed];
           const next: Schema = {
             ...d,
-            sessions: [...d.sessions, completed],
+            sessions,
+            // Stopped by hand, so no `kept`.
+            notes: record(d.notes, notesForWatch({
+              minutes: completed.minutes,
+              completed: false,
+              weather: weatherRef.current,
+              streak: streakLength(sessions, now2),
+              totalSessions: sessions.length,
+            })),
             quarry: d.quarry.map((q) =>
               q.id === completed.quarryId ? { ...q, minutes: q.minutes + completed.minutes } : q,
             ),
@@ -297,6 +323,19 @@ export function useNightWatch() {
         return next;
       });
     },
+
+    /**
+     * Notes that are not earned by finishing a watch — a stone that skipped
+     * well, the lamps put out. Idempotent, so a caller may fire it every time
+     * the thing happens without checking first.
+     */
+    note: (id: string) => setData((d) => {
+      const notes = record(d.notes, [id]);
+      if (notes.length === d.notes.length) return d;
+      const next: Schema = { ...d, notes };
+      save(next);
+      return next;
+    }),
 
     cycleMotion: () => setData((d) => {
       const next: Schema = {

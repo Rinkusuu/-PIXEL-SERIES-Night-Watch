@@ -56,6 +56,8 @@ export type Schema = {
   quarry: Quarry[];
   sessions: SessionRecord[];
   settings: Settings;
+  /** Ids from `session/notes.ts`. What the watch has seen, in the order seen. */
+  notes: string[];
 };
 
 export function emptySchema(): Schema {
@@ -63,6 +65,7 @@ export function emptySchema(): Schema {
     version: 1,
     quarry: [],
     sessions: [],
+    notes: [],
     settings: {
       huntMinutes: 50,
       respiteMinutes: 10,

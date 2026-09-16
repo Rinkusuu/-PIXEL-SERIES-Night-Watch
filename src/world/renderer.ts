@@ -6,7 +6,7 @@ import { drawWalker } from './figure';
 import { drawFog } from './fog';
 import { drawShafts } from './shafts';
 import { drawLamps, lampSpots, moonPos } from './bloom';
-import { SQUASH, createWater } from './water';
+import { SQUASH, createWater, stoneSkip } from './water';
 import { drawForeground } from './foreground';
 import { VIGNETTE_INK } from './ladder';
 import { drawWeather, effectsFor, type Weather } from './weather';
@@ -173,5 +173,19 @@ export function createWorldRenderer() {
     if (started !== 0) clock.sample(performance.now() - started);
   }
 
-  return { frame, invalidate, plateBuilds: () => builds };
+  /**
+   * A stone, thrown at the river from wherever the pointer was.
+   *
+   * The geometry is `stoneSkip` in water.ts, which is where the ring field
+   * lives; this only turns its answer into rings. Returns how many times the
+   * stone bounced, or 0 for a throw that never touched the water — the count
+   * is the whole of the game.
+   */
+  function skip(x: number, y: number, h: number, deckTop: number): number {
+    const hits = stoneSkip(x, y, horizon(h, deckTop));
+    for (const p of hits) water.ring(p.x, p.y, p.strength);
+    return hits.length;
+  }
+
+  return { frame, invalidate, skip, plateBuilds: () => builds };
 }

@@ -13,13 +13,15 @@ type Props = {
   deckTop: number;
   /** With the glass hidden there is nothing for the parapet to carry. */
   zen: boolean;
+  /** Told how many times it bounced, or 0 for a throw that missed the water. */
+  onSkip?: (bounces: number) => void;
 };
 
-export function World({ values, progress, motion, weather, deckTop, zen }: Props) {
+export function World({ values, progress, motion, weather, deckTop, zen, onSkip }: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
   // Read through a ref so the rAF loop is started exactly once.
-  const latest = useRef({ values, progress, motion, weather, deckTop, zen });
-  latest.current = { values, progress, motion, weather, deckTop, zen };
+  const latest = useRef({ values, progress, motion, weather, deckTop, zen, onSkip });
+  latest.current = { values, progress, motion, weather, deckTop, zen, onSkip };
 
   useEffect(() => {
     const cv = ref.current;
@@ -86,14 +88,34 @@ export function World({ values, progress, motion, weather, deckTop, zen }: Props
       raf = requestAnimationFrame(loop);
     };
 
+    /**
+     * A throw at the river.
+     *
+     * Bound to the WINDOW, not to the canvas, and then filtered — because the
+     * canvas is behind everything and a click on a button never reaches it, so
+     * a canvas listener would miss nothing but would also never fire for the
+     * large parts of the world that the panels cover. Filtering by target is
+     * the same guard the reference project uses, and for the same reason: with
+     * it absent, dragging a slider throws a stone into the water behind it.
+     */
+    const onPointerDown = (e: PointerEvent) => {
+      const t = e.target as Element | null;
+      if (t?.closest?.('.app, .cmd, .topbar')) return;
+      const s = latest.current;
+      const deck = s.zen ? zenDeckTop(h) : (s.deckTop || defaultDeckTop(h));
+      s.onSkip?.(renderer.skip(e.clientX, e.clientY, h, deck));
+    };
+
     resize();
     raf = requestAnimationFrame(loop);
     window.addEventListener('resize', onResize);
+    window.addEventListener('pointerdown', onPointerDown);
 
     return () => {
       cancelAnimationFrame(raf);
       window.clearTimeout(resizeTimer);
       window.removeEventListener('resize', onResize);
+      window.removeEventListener('pointerdown', onPointerDown);
     };
   }, []);
 

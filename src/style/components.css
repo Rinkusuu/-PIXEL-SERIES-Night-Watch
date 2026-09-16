@@ -585,3 +585,10 @@
   padding-top: var(--px2);
   box-shadow: inset 0 var(--px) 0 0 var(--glass-lo);
 }
+
+/* ── Night notes ─────────────────────────────────────────────────────────── */
+.notes { list-style: none; margin: 0 0 var(--px2); padding: 0; }
+/* A logbook line, not a badge: no icon, no chip, no colour. The only thing
+   marking it is the em dash a ledger entry starts with. */
+.notes__line { padding: 1px 0; }
+.notes__line::before { content: '— '; color: var(--acc-brass); }
