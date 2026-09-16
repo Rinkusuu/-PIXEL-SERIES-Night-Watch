@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { Button } from '../components/Button';
 import { COPY } from '../app/copy';
 import { motionLabel } from '../app/motion';
@@ -21,11 +22,22 @@ export function Settings({
   onToggleAlert: (key: keyof Alerts) => void;
   onCycleMotion: () => void;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  // The card is a fixed grid row, so opening this pushes it past the body's
+  // edge and the whole fold lands below the fold — pressing the button looked
+  // like it did nothing at all. The body is the scroll container; this brings
+  // the fold into it.
+  useEffect(() => {
+    if (!open) return;
+    ref.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [open]);
+
   if (!open) return null;
   const { huntMinutes: hunt, respiteMinutes: respite, alerts } = settings;
 
   return (
-    <div className="settings">
+    <div className="settings" ref={ref}>
       <hr className="divider" />
 
       <label className="settings__row">

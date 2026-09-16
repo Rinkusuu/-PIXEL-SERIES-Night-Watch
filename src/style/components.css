@@ -298,7 +298,9 @@
 }
 
 /* ── Settings, folded into The Watch ─────────────────────────────────────── */
-.settings { margin-top: var(--px3); }
+/* Never shrink either: the fold is the thing that made the body overflow, so
+   it is the last thing that should be squeezed to hide the fact. */
+.settings { margin-top: var(--px3); flex: none; }
 .settings__row {
   display: flex;
   align-items: center;
@@ -433,7 +435,14 @@
 .stat__value[data-tone='blood'] { color: var(--acc-blood); }
 
 
-.watch { display: flex; gap: var(--px5); align-items: stretch; flex: 1; min-height: 0; }
+/* `flex: 1; min-height: 0` let this shrink BELOW its own content. With the
+   settings fold open the body ran out of room, this box collapsed toward zero,
+   and its clock and stat column spilled out of their own bounds and drew on
+   top of the settings form underneath — "PANJANG JAGA" printed across the
+   middle of "50:00". `min-height: auto` (the default this was overriding) is
+   what stops a flex item from being compressed past its contents; the body's
+   own `overflow-y: auto` is what absorbs the extra height instead. */
+.watch { display: flex; gap: var(--px5); align-items: stretch; flex: 1 0 auto; }
 /* Two columns of stats on a wide card, one on a narrow one. */
 /* The clock sits at the top of its column and the controls at the bottom, so a
    card twice as tall as before does not simply grow a void under the buttons. */
