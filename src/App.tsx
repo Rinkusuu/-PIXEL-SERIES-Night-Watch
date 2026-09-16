@@ -8,12 +8,24 @@ import { TheLedger } from './panels/TheLedger';
 import { COPY, ambientLine } from './app/copy';
 import { Header } from './components/Header';
 import { useKeys } from './app/useKeys';
+import { Palette } from './components/Palette';
+import { buildCommands } from './app/commands';
 
 export function App() {
   const nw = useNightWatch();
   const gridRef = useRef<HTMLDivElement>(null);
   const [deckTop, setDeckTop] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [ledgerWide, setLedgerWide] = useState(false);
+  /**
+   * Zen: the last feature of a focus timer is hiding the timer.
+   *
+   * It is a class on the root rather than a branch in the tree — unmounting the
+   * panels would throw away the quarry input's draft text and the ledger's view,
+   * and leaving zen would hand you back a different app than the one you left.
+   */
+  const [zen, setZen] = useState(false);
 
   // Space is the one shortcut that has to exist: starting and stopping is what
   // the app is for. `useKeys` ignores keys typed into a field, which is what
@@ -22,9 +34,21 @@ export function App() {
     ' ': () => (nw.session.phase === 'idle' ? nw.actions.start() : nw.actions.stop()),
     s: () => { if (nw.session.phase !== 'idle') nw.actions.skip(); },
     ',': () => setSettingsOpen((o) => !o),
-    escape: () => setSettingsOpen(false),
-  }), [nw.session.phase, nw.actions]);
+    z: () => setZen((o) => !o),
+    'mod+k': () => setPaletteOpen((o) => !o),
+    // Escape unwinds one layer at a time, outermost first — the palette sits
+    // over zen, and zen sits over the settings fold.
+    escape: () => {
+      if (paletteOpen) setPaletteOpen(false);
+      else if (zen) setZen(false);
+      else setSettingsOpen(false);
+    },
+  }), [nw.session.phase, nw.actions, paletteOpen, zen]);
   useKeys(keys);
+
+  useEffect(() => {
+    document.documentElement.dataset.zen = zen ? 'on' : 'off';
+  }, [zen]);
 
   useEffect(() => {
     document.documentElement.style.setProperty('--grain-uri', makeGrainUri());
@@ -49,6 +73,21 @@ export function App() {
 
   const selected = nw.data.quarry.find((q) => q.id === nw.session.quarryId) ?? null;
 
+  const commands = useMemo(() => buildCommands({
+    phase: nw.session.phase,
+    settings: nw.data.settings,
+    quarry: nw.data.quarry,
+    selectedId: nw.session.quarryId,
+    ledgerWide,
+    zen,
+    actions: nw.actions,
+    ui: {
+      toggleSettings: () => setSettingsOpen((o) => !o),
+      toggleLedger: () => setLedgerWide((o) => !o),
+      toggleZen: () => setZen((o) => !o),
+    },
+  }), [nw.session.phase, nw.session.quarryId, nw.data.settings, nw.data.quarry, nw.actions, ledgerWide, zen]);
+
   return (
     <>
       <World
@@ -57,6 +96,7 @@ export function App() {
         motion={nw.motion}
         weather={nw.weather}
         deckTop={deckTop}
+        zen={zen}
       />
       <main className="app">
         {/* The page had three h2 panels and nothing above them, so a screen
@@ -109,9 +149,12 @@ export function App() {
             best={nw.best}
             totals={nw.totals}
             days={nw.retentionDays}
+            view={ledgerWide ? 'window' : 'week'}
+            onToggleView={() => setLedgerWide((o) => !o)}
           />
         </div>
       </main>
+      <Palette open={paletteOpen} commands={commands} onClose={() => setPaletteOpen(false)} />
       <div className="grain" />
       <div className="scanlines" />
       <div className="vignette" />

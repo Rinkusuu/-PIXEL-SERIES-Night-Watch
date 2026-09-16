@@ -83,3 +83,28 @@ body {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* ── Zen ─────────────────────────────────────────────────────────────────────
+   The last feature of a focus timer is hiding the timer.
+
+   The chrome fades rather than unmounting: unmounting would throw away the
+   quarry input's draft and the ledger's view, and leaving zen would hand back
+   a different app than the one you left. `visibility` follows the opacity so
+   the hidden panels are also out of the tab order and out of the
+   accessibility tree — a screen reader should not be read a clock that is not
+   on screen either.
+
+   The world is untouched. That is the whole idea: what is left is the night. */
+:root[data-zen='on'] .app {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--dur-slow) linear, visibility 0s linear var(--dur-slow);
+}
+:root[data-zen='off'] .app {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity var(--dur-slow) linear;
+}
+/* The frame's own darkness lifts a little, because there is no longer a row of
+   glass down there for it to be separating you from. */
+:root[data-zen='on'] .vignette { opacity: 0.55; transition: opacity var(--dur-slow) linear; }

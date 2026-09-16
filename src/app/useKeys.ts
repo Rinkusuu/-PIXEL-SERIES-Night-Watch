@@ -20,11 +20,32 @@ function isTyping(t: EventTarget | null): boolean {
  * without mounting anything. Returns whether the key was claimed.
  */
 export function handleKey(map: Record<string, () => void>, e: KeyboardEvent): boolean {
-  // A modifier means the key belongs to the browser or the OS: ⌘S saves the
-  // page, and stealing it to skip a session would be indefensible.
-  if (e.metaKey || e.ctrlKey || e.altKey) return false;
+  const key = e.key.toLowerCase();
+
+  /**
+   * A chord, written `mod+k`. `mod` is ⌘ on a Mac and Ctrl everywhere else —
+   * the palette has to answer to whichever one the reader's hands expect, and
+   * binding both would steal Ctrl-K from Macs, where it is a real shell key.
+   *
+   * Chords run even while typing. That is the point of ⌘K: it is how you leave
+   * the field you are in.
+   */
+  if (e.metaKey || e.ctrlKey) {
+    if (e.altKey || e.shiftKey) return false;
+    const mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+    if (mac ? !e.metaKey : !e.ctrlKey) return false;
+    const chord = map[`mod+${key}`];
+    if (!chord) return false;
+    e.preventDefault();
+    chord();
+    return true;
+  }
+
+  // Any other modifier means the key belongs to the browser or the OS: ⌥S is
+  // not ours to take either.
+  if (e.altKey) return false;
   if (isTyping(e.target)) return false;
-  const fn = map[e.key.toLowerCase()];
+  const fn = map[key];
   if (!fn) return false;
   // Only now: preventDefault before knowing we handle the key would break Tab,
   // and Space scrolls the page if it is not claimed.

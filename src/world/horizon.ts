@@ -79,6 +79,24 @@ export function defaultDeckTop(h: number): number {
   return h * DECK_DEFAULT;
 }
 
+/**
+ * Where the deck goes when the glass is gone.
+ *
+ * Zen hides the panel row but the row still occupies layout, so `deckTop` stays
+ * where the glass was and the bottom half of the frame becomes bare stone with
+ * nothing standing on it. The composition was built around a parapet with cards
+ * resting on it; take the cards away and the parapet is simply halfway up a
+ * wall.
+ *
+ * So zen pushes the deck to its own floor. The world does not merely lose its
+ * furniture, it expands into the room the furniture was using — more sky, a
+ * deeper river, and the reflection that is the best thing in the picture gets
+ * the space it was always short of.
+ */
+export function zenDeckTop(h: number): number {
+  return h * DECK_MAX;
+}
+
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 export function horizon(h: number, deckTopPx: number): Horizon {

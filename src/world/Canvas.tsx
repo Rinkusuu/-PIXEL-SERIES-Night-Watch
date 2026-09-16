@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { AmbientValues } from '../ambient/types';
 import type { Weather } from './weather';
-import { defaultDeckTop } from './horizon';
+import { defaultDeckTop, zenDeckTop } from './horizon';
 import { createWorldRenderer } from './renderer';
 
 type Props = {
@@ -11,13 +11,15 @@ type Props = {
   weather: Weather;
   /** Top of the glass panel row, in CSS pixels. The balustrade lands here. */
   deckTop: number;
+  /** With the glass hidden there is nothing for the parapet to carry. */
+  zen: boolean;
 };
 
-export function World({ values, progress, motion, weather, deckTop }: Props) {
+export function World({ values, progress, motion, weather, deckTop, zen }: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
   // Read through a ref so the rAF loop is started exactly once.
-  const latest = useRef({ values, progress, motion, weather, deckTop });
-  latest.current = { values, progress, motion, weather, deckTop };
+  const latest = useRef({ values, progress, motion, weather, deckTop, zen });
+  latest.current = { values, progress, motion, weather, deckTop, zen };
 
   useEffect(() => {
     const cv = ref.current;
@@ -70,7 +72,9 @@ export function World({ values, progress, motion, weather, deckTop }: Props) {
       renderer.frame(bg, {
         w,
         h,
-        deckTop: s.deckTop || defaultDeckTop(h),
+        // Zen ignores the measured row: there is no glass to rest on. See
+        // `zenDeckTop`.
+        deckTop: s.zen ? zenDeckTop(h) : (s.deckTop || defaultDeckTop(h)),
         v: s.values,
         progress: s.progress,
         timeMs: t,

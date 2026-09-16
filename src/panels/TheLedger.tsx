@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Button } from '../components/Button';
 import { Meter } from '../components/Meter';
 import { Panel } from '../components/Panel';
@@ -24,7 +23,7 @@ function band(minutes: number, peak: number): number {
 }
 
 export function TheLedger({
-  rows, grid, quarryTotals, streak, best, totals, days,
+  rows, grid, quarryTotals, streak, best, totals, days, view, onToggleView,
 }: {
   rows: readonly { key: string; minutes: number }[];
   grid: readonly { key: string; minutes: number }[];
@@ -33,8 +32,10 @@ export function TheLedger({
   best: number;
   totals: { minutes: number; nights: number };
   days: number;
+  /** Lifted, so the palette can switch it too — one source, not two. */
+  view: 'week' | 'window';
+  onToggleView: () => void;
 }) {
-  const [view, setView] = useState<'week' | 'window'>('week');
   const empty = totals.minutes === 0;
   const peak = Math.max(60, ...rows.map((r) => r.minutes));
   const gridPeak = Math.max(60, ...grid.map((r) => r.minutes));
@@ -46,7 +47,7 @@ export function TheLedger({
       float
       className="span-4"
       tools={!empty && (
-        <Button onClick={() => setView((v) => (v === 'week' ? 'window' : 'week'))}>
+        <Button onClick={onToggleView}>
           {view === 'week' ? COPY.ledger.toWindow : COPY.ledger.toWeek}
         </Button>
       )}

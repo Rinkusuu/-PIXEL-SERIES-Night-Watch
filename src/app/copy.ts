@@ -27,6 +27,38 @@ export const COPY = {
     motion: 'gerak',
     alertNames: { title: 'JUDUL', chime: 'LONCENG', notify: 'NOTIF' },
   },
+  /**
+   * Palette labels. Lower case and observational like every other sentence
+   * here — a command list is still the watchman speaking, not a control panel
+   * shouting. The only upper case in this app is on the four hard controls.
+   */
+  cmd: {
+    placeholder: 'apa yang dikerjakan malam ini…',
+    empty: 'tidak ada yang cocok.',
+    foot: '↑↓ pilih · ⏎ jalankan · esc tutup',
+    start: 'mulai jaga', startHint: 'nyalakan lampu dan mulai hitung',
+    stop: 'hentikan jaga', stopHint: 'catat yang sudah terkumpul',
+    skip: 'lewati fase ini', skipHint: 'tanpa mencatat apa pun',
+    zenOn: 'masuk zen', zenOff: 'keluar dari zen',
+    zenHint: 'sembunyikan semuanya; tinggal malamnya',
+    takeQuarry: (n: string) => `ambil buruan: ${n.toLowerCase()}`,
+    takeQuarryHint: 'waktu jaga ini dicatat atasnya',
+    dropQuarry: (n: string) => `lepas buruan: ${n.toLowerCase()}`,
+    dropQuarryHint: 'jaga tanpa nama',
+    // Short label, detail in the hint. A row that wraps to two lines makes the
+    // whole list ragged and costs more to scan than the words are worth.
+    durations: (h: number) => `atur jaga ${h} menit`,
+    durationsHint: (r: number) => `jeda ${r} menit · berlaku untuk jaga berikutnya`,
+    alert: (on: boolean, name: string) =>
+      `${on ? 'matikan' : 'nyalakan'} penanda ${name.toLowerCase()}`,
+    alertHint: 'bagaimana akhir fase memberi tahu',
+    ledgerWeek: 'ledger: tujuh malam terakhir',
+    ledgerWindow: 'ledger: sembilan puluh malam',
+    ledgerHint: 'ganti tampilan catatan',
+    motion: (m: string) => `gerak: ${m === 'auto' ? 'ikuti sistem' : m === 'on' ? 'matikan' : 'nyalakan'}`,
+    motionHint: 'dunia tetap digambar penuh; hanya gerakannya',
+    settings: 'buka pengaturan', settingsHint: 'durasi, penanda, gerak',
+  },
   watch: {
     phase: 'fase',
     weather: 'langit',
