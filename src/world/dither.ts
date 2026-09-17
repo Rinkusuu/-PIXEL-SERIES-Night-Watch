@@ -92,3 +92,36 @@ export function ditherPattern(
   // vertically would restart the gradient below the band it was built for.
   return g.createPattern(cv, 'repeat-x');
 }
+
+/**
+ * ── The rule, and the experiment that settled it ───────────────────────────
+ *
+ * **Matter is quantised. Light is not.**
+ *
+ * Every solid surface in this picture is hard-edged blocks, and every large
+ * soft FIELD — the sky, the river's body — is quantised through the matrix
+ * above. Halos, coronas and fog lobes are left continuous.
+ *
+ * That line was undeclared for most of the project's life, which is a fair
+ * criticism on its own: an unstated rule reads as an accident. So it was tested
+ * the other way. Every halo was rebuilt as a Bayer-dithered sprite, cached per
+ * colour and scaled to each light — cheaper than the gradients it replaced, and
+ * consistent on paper.
+ *
+ * On screen it was clearly worse, and the reason is worth keeping:
+ *
+ *   **A 4×4 ordered dither is only a dither at 1:1.** Scale the sprite up to a
+ *   hundred-pixel lantern halo and each cell of the matrix becomes a
+ *   twelve-pixel block. The pattern stops dissolving and starts tiling — the
+ *   exact failure this file warns about for the periodic-lattice case, arrived
+ *   at from the other direction. The frame came back reading as coarse
+ *   checkered blobs over everything, and the fog became a visible grid.
+ *
+ * The sky and the river survive it because their tile is generated at screen
+ * scale and repeated, never stretched. A halo cannot be: it is a different size
+ * for every light.
+ *
+ * So the rule stands, and it is a choice rather than an omission: matter is
+ * made of pixels because matter has edges, and light is continuous because
+ * light is. Anything added later follows it.
+ */
