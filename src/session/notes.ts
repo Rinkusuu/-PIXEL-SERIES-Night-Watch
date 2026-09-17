@@ -11,30 +11,32 @@ import type { Weather } from '../world/weather';
  *
  * Three rules follow from that, and all three are load-bearing:
  *
- * 1. They are OBSERVATIONS. "hujan turun sepanjang jaga ini", not "well done".
+ * 1. They are OBSERVATIONS. "it rained the whole watch", not "well done".
  *    Nothing here is addressed to you; it is a line in a logbook.
  * 2. They never interrupt. No toast, no fanfare, no badge that flies in — DNA
  *    §11 forbids a banner and the watch would not shout at you mid-sentence.
  *    They appear in the Ledger, where a record belongs, and you find them when
  *    you go looking.
- * 3. They are mostly about the NIGHT, not about you. Weather, the moon, the
+ * 3. English, because this is the watch speaking and not a control you press.
+ *    See the language note at the top of `copy.ts`.
+ * 4. They are mostly about the NIGHT, not about you. Weather, the moon, the
  *    dawn. What you did is already counted in minutes; this is what it was like
  *    outside while you did it.
  */
 export type Note = { id: string; text: string };
 
 export const NOTES: readonly Note[] = [
-  { id: 'first', text: 'malam pertama tercatat.' },
-  { id: 'kept', text: 'satu jaga ditutup sampai fajar, tanpa berhenti.' },
-  { id: 'fog', text: 'kabut naik dari sungai sepanjang jaga itu.' },
-  { id: 'rain', text: 'hujan turun sepanjang jaga itu. batunya basah.' },
-  { id: 'fullmoon', text: 'purnama. sungai memantulkannya utuh.' },
-  { id: 'clear', text: 'langit bersih. bintangnya terhitung.' },
-  { id: 'week', text: 'tujuh malam berturut-turut. lampunya hafal.' },
-  { id: 'fortnight', text: 'empat belas malam. jalanan mulai mengenali langkahnya.' },
-  { id: 'long', text: 'satu jaga lewat sembilan puluh menit.' },
-  { id: 'stone', text: 'sebuah batu melompat lima kali di air.' },
-  { id: 'dark', text: 'lampu dipadamkan sekali; malamnya tetap di sana.' },
+  { id: 'first', text: 'the first night is on the book.' },
+  { id: 'kept', text: 'a watch carried to dawn without breaking.' },
+  { id: 'fog', text: 'the fog came up off the river and stayed.' },
+  { id: 'rain', text: 'it rained the whole watch. the stone is wet.' },
+  { id: 'fullmoon', text: 'full moon. the river held all of it.' },
+  { id: 'clear', text: 'a clear sky. the stars were countable.' },
+  { id: 'week', text: 'seven nights running. the lamps know the hour.' },
+  { id: 'fortnight', text: 'fourteen nights. the street knows the step.' },
+  { id: 'long', text: 'one watch ran past ninety minutes.' },
+  { id: 'stone', text: 'a stone went five bounces across the water.' },
+  { id: 'dark', text: 'the lamps were put out once. the night stayed.' },
 ];
 
 const BY_ID = new Map(NOTES.map((n) => [n.id, n]));

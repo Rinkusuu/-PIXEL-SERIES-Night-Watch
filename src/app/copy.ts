@@ -3,10 +3,28 @@ import type { Phase } from '../session/machine';
 /**
  * Spec §7. Every state has a hand-written sentence; none are defaults.
  * The voice is a night watchman: it observes, it never encourages.
+ *
+ * ## Which language, and why there are two
+ *
+ * The original file was English throughout except for four button labels, and
+ * that was not an oversight — it is the line this app is built on:
+ *
+ *   **The watch speaks English. The controls speak Indonesian.**
+ *
+ * The watchman is a Londoner in 1880 and the river is the Thames; his sentences
+ * are his. The buttons are not his — they are yours, on your machine, in your
+ * language. So every line that is the WATCH speaking is English (the ambient
+ * sentences, the empty states, the ledger, the notes), and every label on a
+ * thing you press is Indonesian (the four hard controls, the settings, the
+ * palette's labels, hints and prompts).
+ *
+ * The rule went unwritten for most of this project's life and was quietly
+ * broken twice: the night notes and the tagline were written in Indonesian,
+ * and both are the watch speaking. `tests/app/copy.test.ts` enforces it now.
  */
 export const COPY = {
   title: 'Night Watch',
-  tagline: 'satu malam berjaga di atas sungai.',
+  tagline: 'one night kept over the river.',
   idleWithQuarry: 'the lamps are unlit.',
   idleNoQuarry: 'no quarry named. the street is quiet.',
   dusk: 'the lamps are lit.',

@@ -7,6 +7,7 @@ import type { WeatherFx } from './weather';
 import { LAMP_H, REFUGE_H, piers } from './bridge';
 import { lanternAnchor } from './foreground';
 import { rand } from './rng';
+import { ARC_LIGHT } from './ladder';
 
 const TOTAL_LAMPS = 14;
 
@@ -124,14 +125,25 @@ export function lampSpots(
     });
   }
 
-  // Street standards along the near rail.
+  // Standards along the near rail. Two of the five are electric, and they are
+  // the two at the FAR end — the new lamps went up from one end of the
+  // Embankment, so a mixed row is a row caught mid-replacement.
   for (let k = 0; k < 5; k++) {
     out.push({
       x: Math.round(w * (0.18 + k * 0.19)),
       y: hz.railTop - 6,
-      r: 3,
-      lit: k < Math.max(1, Math.round((n / TOTAL_LAMPS) * 5)),
-      kind: 'street',
+      // An arc lamp is physically bigger and throws further. This is the only
+      // place in the app where two lamp kinds sit at the same depth, so it is
+      // the only place the size difference can actually be read.
+      r: k >= 3 ? 4 : 3,
+      // The electric ones are ALWAYS lit, and the gas comes up behind them as
+      // the night deepens. That is the right way round twice over: an arc lamp
+      // is thrown by a switch at a generating station, while every gas standard
+      // waits for a man with a pole — and it also means the one cold light in
+      // the picture is visible from the first frame instead of arriving in the
+      // last ten minutes of a session nobody watches to the end.
+      lit: k >= 3 || k < Math.max(1, Math.round((n / TOTAL_LAMPS) * 5)),
+      kind: k >= 3 ? 'arc' : 'street',
     });
   }
 
@@ -174,6 +186,8 @@ function glowBlob(
  */
 export const MOON_DISC = '#f4f7f4';
 
+
+
 /**
  * The moon's radius before the weather scales it. Shared with `sky.ts`, which
  * draws the body onto the plate so the skyline can stand in front of it — two
@@ -182,11 +196,18 @@ export const MOON_DISC = '#f4f7f4';
 export const MOON_BASE_R = 30;
 
 const HALO: Record<LampSpot['kind'], number> = {
-  window: 8, bridge: 12, street: 15, lantern: 20, moon: 3.6,
+  // The arc's halo is TIGHTER than the gas beside it, not wider. A flame in a
+  // glass box scatters; an arc between two carbon rods is nearly a point, and
+  // a hard little light next to a soft big one is what sells the difference.
+  window: 8, bridge: 12, street: 15, arc: 9, lantern: 20, moon: 3.6,
 };
 const ALPHA: Record<LampSpot['kind'], number> = {
-  window: 0.34, bridge: 0.34, street: 0.30, lantern: 0.55, moon: 0.30,
+  window: 0.34, bridge: 0.34, street: 0.30, arc: 0.44, lantern: 0.55, moon: 0.30,
 };
+
+/** Everything burns gas except the arcs. */
+const lightColour = (kind: LampSpot['kind'], glow: string) =>
+  (kind === 'arc' ? ARC_LIGHT : glow);
 
 export function drawLamps(
   g: CanvasRenderingContext2D,
@@ -222,9 +243,10 @@ export function drawLamps(
       continue;
     }
 
-    glowBlob(g, s.x, s.y, rad * HALO[s.kind] * fx.haloScale, v.glow, ALPHA[s.kind]);
+    const colour = lightColour(s.kind, v.glow);
+    glowBlob(g, s.x, s.y, rad * HALO[s.kind] * fx.haloScale, colour, ALPHA[s.kind]);
     g.globalAlpha = 1;
-    g.fillStyle = v.glow;
+    g.fillStyle = colour;
     g.fillRect(s.x - rad / 2, s.y - rad, Math.max(2, rad), rad * 2.4);
   }
   g.restore();

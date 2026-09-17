@@ -12,6 +12,24 @@ import { hexToRgb, mixRgb, rgbToHex } from '../ambient/interpolate';
 export const VIGNETTE_INK = '#05080a';
 
 /**
+ * Electric arc light. Cold, and deliberately the only thing in the picture that
+ * is not the colour of burning gas.
+ *
+ * The Victoria Embankment took Jablochkoff arc lamps in 1878 and was the first
+ * street in London lit by electricity. People hated them. The complaint in the
+ * papers was that the light was ghastly — that it made faces look like the
+ * faces of the dead — and standing a few of them in a row of gas standards is
+ * the fastest way to say which decade this is.
+ *
+ * It is also the one colour decision in this app taken against the style
+ * parent, which says the gas flame is the only light source colour. The parent
+ * is describing a warm/cool discipline; this is a second COOL light, so the
+ * discipline survives — and the contrast between the two is the whole point of
+ * putting them on the same railing.
+ */
+export const ARC_LIGHT = '#dfeaf2';
+
+/**
  * How far each depth is dragged from the fog toward the ink.
  *
  * Every rung measures against `sky[2]`, the fog — the brightest thing on screen

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { COPY, ambientLine, formatClock } from '../../src/app/copy';
+import { NOTES } from '../../src/session/notes';
 
 describe('formatClock', () => {
   it('formats minutes and seconds, zero-padded', () => {
@@ -64,5 +65,66 @@ describe('every hand-written string', () => {
 
   it('keeps control labels uppercase and unpoeticised', () => {
     expect(Object.values(COPY.labels)).toEqual(['MULAI', 'HENTI', 'LEWATI', 'TAMBAH']);
+  });
+});
+
+/**
+ * The watch speaks English; the controls speak Indonesian. The rule is stated
+ * at the top of `copy.ts` and it went unwritten — and therefore quietly broken
+ * twice — for most of this project's life.
+ *
+ * Detecting a language properly is not something a unit test should attempt.
+ * What it CAN do is catch the specific way this gets broken: an Indonesian
+ * function word turning up in a sentence that belongs to the watch. Those words
+ * do not occur in English, so a hit is unambiguous.
+ */
+const ID_WORDS = [
+  'yang', 'dan', 'atau', 'tidak', 'ini', 'itu', 'dari', 'untuk', 'dengan',
+  'sudah', 'belum', 'akan', 'malam', 'jaga', 'sepanjang', 'satu ', 'tujuh',
+];
+
+function speaksIndonesian(line: string): string | null {
+  const l = ` ${line.toLowerCase()} `;
+  return ID_WORDS.find((w) => l.includes(` ${w.trim()} `)) ?? null;
+}
+
+describe('the watch speaks English', () => {
+  // Rebuilt here: `all` above is scoped to its own describe block.
+  const sentences: string[] = [
+    ...(Object.values(COPY) as unknown[]).filter((v) => typeof v === 'string') as string[],
+    ...[0.1, 0.5, 0.7, 0.95].map((progress) =>
+      ambientLine({ phase: 'hunt', progress, hasQuarry: true, bloodmoon: false })),
+    ambientLine({ phase: 'idle', progress: 0, hasQuarry: false, bloodmoon: false }),
+    ambientLine({ phase: 'respite', progress: 1, hasQuarry: true, bloodmoon: false }),
+  ];
+
+  it('in every ambient sentence', () => {
+    for (const line of sentences) {
+      if ((Object.values(COPY.labels) as string[]).includes(line)) continue;
+      expect(speaksIndonesian(line), line).toBeNull();
+    }
+  });
+
+  it('in its own logbook', () => {
+    // The notes are the watch writing down what it saw. They were Indonesian.
+    for (const n of NOTES) expect(speaksIndonesian(n.text), n.id).toBeNull();
+  });
+
+  it('in the line under its own name', () => {
+    expect(speaksIndonesian(COPY.tagline), COPY.tagline).toBeNull();
+  });
+});
+
+describe('the controls speak Indonesian', () => {
+  it('on the four hard buttons', () => {
+    expect(COPY.labels.start).toBe('MULAI');
+  });
+
+  it('and in the palette, which is a list of things you press', () => {
+    // Not a spot check of one string: every label there should be a control
+    // label, so at least most of them should carry an Indonesian function word.
+    const labels = [COPY.cmd.start, COPY.cmd.stop, COPY.cmd.skip, COPY.cmd.zenOn];
+    expect(labels.filter((l) => l.includes('jaga') || l.includes('zen')).length)
+      .toBeGreaterThanOrEqual(3);
   });
 });

@@ -4,6 +4,7 @@ import { stream } from './rng';
 import { piers } from './bridge';
 import { ditherPattern } from './dither';
 import { hexToRgb } from '../ambient/interpolate';
+import { ARC_LIGHT } from './ladder';
 
 /**
  * How hard the world above is compressed as it comes back up out of the water.
@@ -31,7 +32,7 @@ export type LampSpot = {
   y: number;
   r: number;
   lit: boolean;
-  kind: 'window' | 'bridge' | 'street' | 'lantern' | 'moon';
+  kind: 'window' | 'bridge' | 'street' | 'arc' | 'lantern' | 'moon';
 };
 
 /**
@@ -228,10 +229,15 @@ export function createWater(seed = 777): Water {
       //     gaslight on a river is the most London image there is; this is the
       //     part that must never be economised.
       g.globalCompositeOperation = 'lighter';
-      g.fillStyle = v.glow;
       for (const lamp of lamps) {
         if (!lamp.lit) continue;
-        if (lamp.kind !== 'bridge' && lamp.kind !== 'window' && lamp.kind !== 'moon') continue;
+        if (lamp.kind !== 'bridge' && lamp.kind !== 'window'
+            && lamp.kind !== 'moon' && lamp.kind !== 'arc') continue;
+        // The arcs stand at the river's near edge and are the one light in the
+        // picture that is not gas, so their column is cold. Set per lamp rather
+        // than once before the loop: whichever colour the last lamp left behind
+        // would otherwise paint the next one's path.
+        g.fillStyle = lamp.kind === 'arc' ? ARC_LIGHT : v.glow;
         const cx = lamp.x;
 
         // How far down the river this light's path runs, and how hard. A gas
