@@ -37,7 +37,11 @@ describe('openings', () => {
   it('gives the clock tower exactly one clock', () => {
     // A landmark is only a landmark once, and that holds for its face too.
     for (const [w, top, bot] of BANDS) {
-      const tower = skyline(w, top, bot, 17).find((b) => b.kind === 'clockTower')!;
+      // A landmark ceiling has to be passed in, because only the band that
+      // gets a landmark gets a tower — the ones behind get none by design.
+      const tower = skyline(w, top, bot, 17, 1, Math.round(top * 0.55))
+        .find((b) => b.kind === 'clockTower')!;
+      expect(tower, `band ${w}`).toBeDefined();
       expect(openings(tower, bot).filter((o) => o.kind === 'clock')).toHaveLength(1);
     }
   });

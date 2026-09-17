@@ -15,6 +15,19 @@ export type Horizon = {
   /** highest spire in the NEAR city band */
   cityTop: number;
   /**
+   * The landmark's own ceiling, ABOVE the band every other building shares.
+   *
+   * A hero element cannot be hero-sized by accident. When the landmark was
+   * simply whichever block came out widest, it reached `cityTop` like any other
+   * tall block and the eye had no reason to choose it — the critique for that
+   * was "mata saya mencari apa yang menjadi pusat perhatian, jawabannya tidak
+   * jelas", and a tower level with its neighbours is exactly what produces it.
+   *
+   * It gets a line of its own so the margin is deliberate and survives every
+   * viewport, rather than depending on a random height roll landing high.
+   */
+  landmarkTop: number;
+  /**
    * Ceilings for the two bands behind it.
    *
    * All three bands used to be generated between `cityTop` and `cityBot`, so
@@ -119,6 +132,10 @@ export function horizon(h: number, deckTopPx: number): Horizon {
     // is reached by a handful of towers and the rest of the band sits well
     // under it. Grandeur is the gap between the two, and the gap needs room.
     cityTop: Math.round(above * 0.30),
+    // Half the remaining sky again. Clear enough that nothing else can reach
+    // it, close enough that the tower is still IN the city rather than hanging
+    // over it.
+    landmarkTop: Math.round(above * 0.30 * 0.52),
     // Measured down from the near band's ceiling, as a share of the band's own
     // height — so the three stay in proportion at any viewport rather than
     // converging when the band is short.

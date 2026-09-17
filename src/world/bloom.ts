@@ -63,6 +63,20 @@ export function lampSpots(
   for (const [bi, b] of blocks.entries()) {
     if (b.kind === 'crane') continue;
     for (const o of openings(b, hz.cityBot)) {
+      // The landmark's clock face is the one opening in the city that is lit
+      // from behind rather than from a room. It is also the whole reason the
+      // tower is a focal point after dark: an unlit clock is a dark disc on a
+      // dark tower, and the eye has nothing to find.
+      if (o.kind === 'clock') {
+        out.push({
+          x: Math.round(o.x + o.w / 2),
+          y: Math.round(o.y + o.h / 2),
+          r: Math.round(o.w * 0.5),
+          lit: true,
+          kind: 'clockface',
+        });
+        continue;
+      }
       if (o.kind !== 'window') continue;
       // Nothing below the upstream bridge's parapet is visible. The roadway
       // runs the full width of the frame from `bridgeTop` down, and what shows
@@ -204,9 +218,13 @@ const HALO: Record<LampSpot['kind'], number> = {
   // glass box scatters; an arc between two carbon rods is nearly a point, and
   // a hard little light next to a soft big one is what sells the difference.
   window: 8, bridge: 12, street: 15, arc: 9, lantern: 20, moon: 3.6,
+  // Tighter than a window's for its size: a clock face is a big pane of glass
+  // with a lamp behind it, not a room spilling out of an opening.
+  clockface: 2.6,
 };
 const ALPHA: Record<LampSpot['kind'], number> = {
   window: 0.34, bridge: 0.34, street: 0.30, arc: 0.44, lantern: 0.55, moon: 0.30,
+  clockface: 0.42,
 };
 
 /** Everything burns gas except the arcs. */
@@ -259,6 +277,16 @@ export function drawLamps(
     );
     g.globalAlpha = Math.min(1, 0.45 + power * 0.45);
     g.fillStyle = colour;
+    if (s.kind === 'clockface') {
+      // A DISC, not the tall bar every other light gets. That bar is the shape
+      // of a lit window — correct for a window, and for a clock it drew a
+      // glowing rectangle sitting inside the dark circle the plate had already
+      // cut for the dial.
+      g.beginPath();
+      g.arc(s.x, s.y, rad, 0, Math.PI * 2);
+      g.fill();
+      continue;
+    }
     g.fillRect(s.x - rad / 2, s.y - rad, Math.max(2, rad), rad * 2.4);
   }
   g.restore();

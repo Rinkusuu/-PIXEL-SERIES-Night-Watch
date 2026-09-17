@@ -111,8 +111,67 @@ export const FAR_SCALE = 0.55;
  */
 export const MID_SCALE = 0.78;
 
+/**
+ * Every line of the landmark, from one place.
+ *
+ * Read by the massing, by `openings()` (the clock face and the belfry louvres
+ * must land ON the stages the massing drew) and by the detail pass. Three
+ * modules computing a tower's stages independently is the fault this project
+ * has paid for four times — see `horizon()`, `setbackOf`, `eaveOf`, `archCrown`.
+ */
+export function towerOf(b: Block, bot: number) {
+  const shaftW = Math.min(b.w, 30);
+  const cx = Math.round(b.x + b.w / 2);
+  const bh = bot - b.top;
+
+  const stageW = Math.round(shaftW * 1.34);
+  const belfryW = Math.round(shaftW * 0.82);
+  const baseW = Math.round(shaftW * 1.22);
+
+  // Measured DOWN from the top, so the ornament keeps its proportions when the
+  // tower is tall and the shaft simply gets longer — rather than the spire
+  // stretching and the clock sliding into the roofline.
+  const spire = Math.round(bh * 0.20);
+  const belfryTop = Math.round(b.top + spire);
+  const belfryH = Math.round(shaftW * 0.62);
+  const belfryBot = belfryTop + belfryH;
+  const stageTop = belfryBot;
+  const stageH = Math.round(shaftW * 1.05);
+  const stageBot = stageTop + stageH;
+
+  return {
+    cx,
+    shaftW, shaftX: Math.round(cx - shaftW / 2),
+    stageW, stageX: Math.round(cx - stageW / 2),
+    belfryW, belfryX: Math.round(cx - belfryW / 2),
+    baseW, baseX: Math.round(cx - baseW / 2),
+    spireTop: b.top,
+    belfryTop, belfryBot,
+    stageTop, stageBot,
+    plinth: Math.round(bot - bh * 0.10),
+  };
+}
+
+/**
+ * Where the landmark stands, as a fraction of the width.
+ *
+ * Left of centre, because the moon is at 0.78. Two focal points on opposite
+ * sides of the frame read as a composition; two in the same corner read as a
+ * pile.
+ */
+export const LANDMARK_X = 0.31;
+
+/** How wide a slot the tower wants before it will settle for a narrower one. */
+export const LANDMARK_W = 44;
+
 export function skyline(
   w: number, top: number, bot: number, seed: number, scale = 1,
+  /**
+   * The landmark's own ceiling. `null` for the bands behind, which get no
+   * landmark at all — a second tower at a second distance is not a hero, it is
+   * a pair, and a pair has no centre.
+   */
+  landmarkTop: number | null = null,
 ): Block[] {
   const r = stream(seed);
   const span = bot - top;
@@ -189,9 +248,37 @@ export function skyline(
   // after the fact would put every later block out of step. The massing already
   // draws the tower's shaft narrow inside a wide slot.
   let widest = 0;
-  for (let i = 1; i < out.length; i++) if (out[i]!.w > out[widest]!.w) widest = i;
-  out[widest]!.kind = 'clockTower';
-  out[widest]!.top = top;
+  if (landmarkTop !== null) {
+    // Placed, not picked. It used to go on whichever block happened to come out
+    // widest, which put the one thing the eye is supposed to find somewhere
+    // different every seed — sometimes against the frame edge, sometimes
+    // directly under the moon, where the two strongest elements in the picture
+    // cancel instead of balancing.
+    //
+    // The moon sits at 0.78 of the width. The tower goes at LANDMARK_X, well to
+    // the other side of centre, so the frame reads as two focal points across a
+    // wide composition rather than one crowded corner.
+    const want = w * LANDMARK_X;
+    let best = 0;
+    let bestScore = Infinity;
+    for (let i = 0; i < out.length; i++) {
+      const b = out[i]!;
+      if (b.kind === 'gap') continue;
+      // Distance from the target, with a penalty for a slot too narrow to draw
+      // a tower in. A near miss on a wide block beats a bullseye on an alley.
+      const cx = b.x + b.w / 2;
+      const score = Math.abs(cx - want) + Math.max(0, LANDMARK_W - b.w) * 6;
+      if (score < bestScore) { bestScore = score; best = i; }
+    }
+    widest = best;
+    out[best]!.kind = 'clockTower';
+    out[best]!.top = landmarkTop;
+  } else {
+    // No landmark in the bands behind. A second tower at a second distance is
+    // not a hero, it is a pair, and a pair has no centre. `widest` is still
+    // wanted below as the anchor the factory fallback measures from.
+    for (let i = 1; i < out.length; i++) if (out[i]!.w > out[widest]!.w) widest = i;
+  }
 
   // Smoke needs a chimney. Without this guarantee a seed can produce a city
   // where the smoke layer has nowhere to attach and silently draws nothing.
@@ -347,26 +434,28 @@ export function openings(b: Block, bot: number): Opening[] {
     }
 
     case 'clockTower': {
-      const sw = Math.min(w, 30);
-      const sx = x + (w - sw) / 2;
-      const face = Math.max(9, Math.round(sw * 0.5));
-      const faceY = Math.round(top + sw);
+      // Straight off `towerOf`, so the face cannot drift off the stage the
+      // massing built for it.
+      const t = towerOf(b, bot);
       const out: Opening[] = [];
-      if (faceY + face <= bot - 4) {
+      const face = Math.max(9, Math.round(t.stageW * 0.52));
+      out.push({
+        kind: 'clock',
+        x: Math.round(t.cx - face / 2),
+        y: Math.round(t.stageTop + (t.stageBot - t.stageTop - face) / 2),
+        w: face, h: face,
+      });
+      // Belfry louvres: two tall slots, open to the bells. Not windows — a
+      // belfry is a room with no glass in it, and drawing it glazed is what
+      // makes a tower read as an office with a hat on.
+      const lw = Math.max(2, Math.round(t.belfryW * 0.18));
+      const lh = Math.max(4, Math.round((t.belfryBot - t.belfryTop) * 0.6));
+      const ly = Math.round(t.belfryTop + (t.belfryBot - t.belfryTop - lh) / 2);
+      for (const sgn of [-1, 1]) {
         out.push({
-          kind: 'clock',
-          x: Math.round(sx + (sw - face) / 2), y: faceY, w: face, h: face,
+          kind: 'louvre',
+          x: Math.round(t.cx + sgn * t.belfryW * 0.22 - lw / 2), y: ly, w: lw, h: lh,
         });
-      }
-      // Belfry louvres, under the clock stage.
-      const louvreY = faceY + face + 6;
-      if (louvreY + 8 <= bot - 4) {
-        for (let i = 0; i < 3; i++) {
-          out.push({
-            kind: 'louvre',
-            x: Math.round(sx + 4 + i * ((sw - 8) / 3)), y: louvreY, w: 3, h: 8,
-          });
-        }
       }
       return out;
     }
@@ -443,12 +532,34 @@ function massing(g: CanvasRenderingContext2D, b: Block, bot: number): void {
       break;
     }
     case 'clockTower': {
-      const sw = Math.min(w, 30);
-      const sx = Math.round(x + (w - sw) / 2);
-      const stage = Math.round(top + sw * 0.9);
-      g.moveTo(sx, bot); g.lineTo(sx, stage);
-      g.lineTo(sx + Math.round(sw / 2), top); g.lineTo(sx + sw, stage);
-      g.lineTo(sx + sw, bot); g.closePath();
+      // The one silhouette in the city that is not a box, a gable or a cone,
+      // and the only one whose profile goes OUT before it goes up. A clock
+      // stage that oversails its own shaft is the move: nothing else in this
+      // vocabulary widens as it rises, so the eye finds it without being told.
+      const t = towerOf(b, bot);
+      // Buttressed foot.
+      g.moveTo(t.baseX, bot);
+      g.lineTo(t.baseX, t.plinth);
+      g.lineTo(t.shaftX, t.plinth);
+      // Shaft, up to the stage.
+      g.lineTo(t.shaftX, t.stageBot);
+      // Stage, oversailing on both sides.
+      g.lineTo(t.stageX, t.stageBot);
+      g.lineTo(t.stageX, t.stageTop);
+      // Belfry, stepped back in again.
+      g.lineTo(t.belfryX, t.belfryBot);
+      g.lineTo(t.belfryX, t.belfryTop);
+      // Spire.
+      g.lineTo(t.cx, top);
+      g.lineTo(t.belfryX + t.belfryW, t.belfryTop);
+      g.lineTo(t.belfryX + t.belfryW, t.belfryBot);
+      g.lineTo(t.stageX + t.stageW, t.stageTop);
+      g.lineTo(t.stageX + t.stageW, t.stageBot);
+      g.lineTo(t.shaftX + t.shaftW, t.stageBot);
+      g.lineTo(t.shaftX + t.shaftW, t.plinth);
+      g.lineTo(t.baseX + t.baseW, t.plinth);
+      g.lineTo(t.baseX + t.baseW, bot);
+      g.closePath();
       break;
     }
     case 'factory': {
@@ -737,27 +848,39 @@ export function drawSkyline(
         break;
       }
       case 'clockTower': {
-        const sw = Math.min(b.w, 30);
-        const sx = Math.round(b.x + (b.w - sw) / 2);
-        const stage = Math.round(b.top + sw * 0.9);
-        // The clock stage, and the battlement standing on it. Merlons are the
-        // one ornament that says Yharnam rather than "town hall" — four teeth
-        // of solid stone with sky cut between them.
-        g.fillStyle = s.ink;
-        g.fillRect(sx - 3, stage, sw + 6, 2);
-        g.fillStyle = s.lit;
-        g.fillRect(sx - 3, stage - 1, sw + 6, 1);
+        const t = towerOf(b, bot);
+        const cap = (y: number, cx0: number, ww: number) => {
+          g.fillStyle = s.ink;
+          g.fillRect(cx0, y, ww, 2);
+          g.fillStyle = s.lit;
+          g.fillRect(cx0, y - 1, ww, 1);
+        };
+        // A cornice on every setback the silhouette makes. This is where the
+        // tower stops being an outline and starts being masonry — each ledge
+        // catches a pixel of sky, which is the same trick the flat blocks use.
+        cap(t.stageBot, t.stageX - 2, t.stageW + 4);
+        cap(t.belfryBot, t.belfryX - 2, t.belfryW + 4);
+        cap(t.plinth, t.baseX, t.baseW);
+
+        // Pinnacles at the belfry's four corners, the ornament that says gothic
+        // rather than town hall. Blocks, never strokes — a four-pixel diagonal
+        // reads as grit at this size, which is why the spires lost theirs once.
         g.fillStyle = s.fill;
-        for (let k = 0; k < 4; k++) {
-          g.fillRect(Math.round(sx - 2 + k * ((sw + 4) / 4)), stage - 6, 3, 6);
+        for (const sgn of [-1, 1]) {
+          const px = sgn < 0 ? t.belfryX - 3 : t.belfryX + t.belfryW;
+          g.fillRect(px, t.belfryTop - 5, 3, t.belfryBot - t.belfryTop + 5);
+          g.fillRect(px - 1, t.belfryTop - 8, 5, 3);
         }
+
         // Hands, frozen. A clock that ticks in a painted city reads as a bug.
+        const face = Math.max(9, Math.round(t.stageW * 0.52));
+        const fy = Math.round(t.stageTop + (t.stageBot - t.stageTop) / 2);
         g.fillStyle = s.ink;
-        const face = Math.max(9, Math.round(sw * 0.5));
-        const fx = Math.round(sx + sw / 2);
-        const fy = Math.round(b.top + sw + face / 2);
-        g.fillRect(fx - 1, fy - Math.round(face * 0.34), 2, Math.round(face * 0.34));
-        g.fillRect(fx, fy, Math.round(face * 0.30), 2);
+        g.fillRect(t.cx - 1, fy - Math.round(face * 0.34), 2, Math.round(face * 0.34));
+        g.fillRect(t.cx, fy, Math.round(face * 0.30), 2);
+
+        // A finial on the spire's point.
+        g.fillRect(t.cx - 1, b.top - 6, 2, 6);
         break;
       }
       case 'factory': {

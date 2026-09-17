@@ -105,7 +105,7 @@ function recordingCtx(): { g: CanvasRenderingContext2D; log: string[] } {
 
 describe('motion: 0 freezes the river without emptying it', () => {
   const hz = {
-    h: 900, cityTop: 144, cityTopMid: 179, cityTopFar: 217,
+    h: 900, cityTop: 144, landmarkTop: 75, cityTopMid: 179, cityTopFar: 217,
     skyBot: 198, cityBot: 360, bridgeTop: 310, bridgeBot: 387,
     waterTop: 360, waterBot: 540, railTop: 540, railBot: 594, deckTop: 594,
   };

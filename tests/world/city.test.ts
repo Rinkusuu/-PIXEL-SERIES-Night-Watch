@@ -3,11 +3,13 @@ import {
   FAR_SCALE, MIN_SPIRE_ASPECT, SPIRE_MAX_W, drawSkyline, openings, setbackOf,
   skyline, skyline as gen,
   type ShapeKind,
+  LANDMARK_X, towerOf,
 } from '../../src/world/city';
 import { countingCtx } from '../helpers/counting-ctx';
 
 describe('skyline', () => {
-  const blocks = skyline(1200, 100, 400, 91);
+  // With a landmark ceiling: the near band is the one that carries the tower.
+  const blocks = skyline(1200, 100, 400, 91, 1, 55);
 
   it('covers the full width with no gap and no overlap', () => {
     let x = 0;
@@ -36,8 +38,14 @@ describe('skyline', () => {
     }
   });
 
-  it('keeps every roof inside its band', () => {
+  it('keeps every roof inside its band, except the one that is meant to break it', () => {
     for (const b of blocks) {
+      // The landmark has a ceiling of its own, ABOVE the band, and that margin
+      // is the whole reason the eye can find it. Everything else stays in.
+      if (b.kind === 'clockTower') {
+        expect(b.top).toBeLessThan(100);
+        continue;
+      }
       expect(b.top).toBeGreaterThanOrEqual(100);
       expect(b.top).toBeLessThan(400);
     }
@@ -101,7 +109,8 @@ describe('every shape carries its own detail', () => {
     gable: 8,       // shade + three shingle courses + dormer face, lid, window + eaves
     spire: 9,       // shade + six crockets + cross shaft and arm
     dome: 10,       // shade + lantern, lid, spike + four ribs + band and its lip
-    clockTower: 9,  // shade + stage band and lip + four merlons + two hands
+    clockTower: 14, // shade + three cornices, each a band and a lip
+                    // + two pinnacles, each a shaft and a cap + two hands + finial
     factory: 7,     // shade + two iron bands + cap + eaves band and lip + plinth
     crane: 10,      // shade + mast + seven jib segments + hook
     gap: 0,         // nothing stands here; the slot is sky
@@ -186,7 +195,9 @@ describe('gaps let the sky through', () => {
   it('still guarantees a clock tower and a chimney', () => {
     // Smoke needs somewhere to come from, and a landmark is still a landmark.
     for (const seed of seeds) {
-      const blocks = skyline(1400, 100, 460, seed);
+      // The near band is the one that carries the landmark, so it is the one
+      // this guarantee is about — the bands behind get none by design.
+      const blocks = skyline(1400, 100, 460, seed, 1, 55);
       expect(blocks.filter((b) => b.kind === 'clockTower')).toHaveLength(1);
       expect(blocks.some((b) => b.kind === 'factory')).toBe(true);
     }
@@ -271,5 +282,79 @@ describe('aerial perspective', () => {
   it('is still deterministic per scale', () => {
     expect(skyline(1400, 100, 460, 17, FAR_SCALE))
       .toEqual(skyline(1400, 100, 460, 17, FAR_SCALE));
+  });
+});
+
+describe('the landmark', () => {
+  const W = 1440;
+  const TOP = 100;
+  const BOT = 400;
+  const LM = 55;
+
+  it('stands where it was put, not where a wide block happened to fall', () => {
+    // It used to go on whichever block came out widest, so the one thing the
+    // eye is meant to find moved every seed. Across many seeds it must now land
+    // near the same place.
+    for (const seed of [3, 17, 91, 404, 1234, 90210]) {
+      const blocks = skyline(W, TOP, BOT, seed, 1, LM);
+      const t = blocks.find((b) => b.kind === 'clockTower');
+      expect(t, `seed ${seed}`).toBeDefined();
+      const cx = t!.x + t!.w / 2;
+      // Within a block's width of the target, which is as close as a cursor
+      // walking random widths can be asked to come.
+      expect(Math.abs(cx - W * LANDMARK_X), `seed ${seed}`).toBeLessThan(90);
+    }
+  });
+
+  it('is the tallest thing in the band, by a margin nothing else can reach', () => {
+    for (const seed of [3, 17, 91, 404]) {
+      const blocks = skyline(W, TOP, BOT, seed, 1, LM);
+      const t = blocks.find((b) => b.kind === 'clockTower')!;
+      const others = blocks.filter((b) => b !== t && b.kind !== 'gap');
+      expect(t.top).toBe(LM);
+      for (const b of others) expect(b.top, `seed ${seed}`).toBeGreaterThan(t.top);
+    }
+  });
+
+  it('never appears in a band behind, where it would be a pair and not a hero', () => {
+    for (const seed of [3, 17, 91, 404]) {
+      const far = skyline(W, TOP, BOT, seed, FAR_SCALE);
+      expect(far.some((b) => b.kind === 'clockTower'), `seed ${seed}`).toBe(false);
+    }
+  });
+
+  it('keeps the cursor covering the width exactly, tower and all', () => {
+    // The tower converts an existing block rather than inserting one, because
+    // every later block's `x` is the running sum of the widths before it.
+    const blocks = skyline(W, TOP, BOT, 77, 1, LM);
+    let sum = 0;
+    for (const b of blocks) {
+      expect(b.x).toBe(sum);
+      sum += b.w;
+    }
+    expect(sum).toBeGreaterThanOrEqual(W);
+  });
+
+  it('lands its clock face and louvres on the stages the massing drew', () => {
+    const b = { kind: 'clockTower' as const, x: 200, w: 44, top: LM };
+    const t = towerOf(b, BOT);
+    const os = openings(b, BOT);
+    const face = os.find((o) => o.kind === 'clock')!;
+    expect(face.y).toBeGreaterThanOrEqual(t.stageTop);
+    expect(face.y + face.h).toBeLessThanOrEqual(t.stageBot);
+    for (const l of os.filter((o) => o.kind === 'louvre')) {
+      expect(l.y).toBeGreaterThanOrEqual(t.belfryTop);
+      expect(l.y + l.h).toBeLessThanOrEqual(t.belfryBot);
+      expect(l.x).toBeGreaterThanOrEqual(t.belfryX);
+      expect(l.x + l.w).toBeLessThanOrEqual(t.belfryX + t.belfryW);
+    }
+  });
+
+  it('oversails: the clock stage is wider than the shaft under it', () => {
+    // The one profile in the whole vocabulary that goes OUT before it goes up,
+    // which is what makes the eye find it without being told.
+    const t = towerOf({ kind: 'clockTower', x: 0, w: 44, top: LM }, BOT);
+    expect(t.stageW).toBeGreaterThan(t.shaftW);
+    expect(t.belfryW).toBeLessThan(t.stageW);
   });
 });

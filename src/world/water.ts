@@ -32,7 +32,7 @@ export type LampSpot = {
   y: number;
   r: number;
   lit: boolean;
-  kind: 'window' | 'bridge' | 'street' | 'arc' | 'lantern' | 'moon';
+  kind: 'window' | 'bridge' | 'street' | 'arc' | 'lantern' | 'moon' | 'clockface';
   /**
    * How hard this one burns, around 1. Only the windows use it.
    *
@@ -279,8 +279,8 @@ export function createWater(seed = 777): Water {
       g.globalCompositeOperation = 'lighter';
       for (const lamp of lamps) {
         if (!lamp.lit) continue;
-        if (lamp.kind !== 'bridge' && lamp.kind !== 'window'
-            && lamp.kind !== 'moon' && lamp.kind !== 'arc') continue;
+        if (lamp.kind !== 'bridge' && lamp.kind !== 'window' && lamp.kind !== 'moon'
+            && lamp.kind !== 'arc' && lamp.kind !== 'clockface') continue;
         // The arcs stand at the river's near edge and are the one light in the
         // picture that is not gas, so their column is cold. Set per lamp rather
         // than once before the loop: whichever colour the last lamp left behind

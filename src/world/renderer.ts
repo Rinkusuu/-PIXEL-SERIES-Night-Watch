@@ -91,7 +91,9 @@ export function createWorldRenderer() {
       // The skyline only regenerates on a size change. A city that reshuffles
       // every time the palette drifts is a city made of static.
       if (blocks.length === 0 || cachedW !== w || cachedH !== h) {
-        blocks = skyline(w, hz.cityTop, hz.cityBot, Math.round(w * 31 + h));
+        // Only the near band gets the landmark: a second tower at a second
+        // distance is a pair, and a pair has no centre.
+        blocks = skyline(w, hz.cityTop, hz.cityBot, Math.round(w * 31 + h), 1, hz.landmarkTop);
       }
 
       const cv = plate ?? document.createElement('canvas');
