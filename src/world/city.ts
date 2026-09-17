@@ -1,4 +1,4 @@
-import { stream } from './rng';
+import { rand, stream } from './rng';
 
 /**
  * The old skyline was twenty-six equal-width blocks with random heights. The eye
@@ -744,14 +744,51 @@ export function drawSkyline(
         const uw = sb ? b.w - sb.inset * 2 : b.w;
         const ucx = Math.round(ux + uw / 2);
 
-        // Chimney pots. Terraces without them read as filing cabinets.
+        // Roof furniture, and WHICH furniture is the point.
+        //
+        // Every flat block used to get the same three chimney pots and, if it
+        // was wide enough, the same tank in the same place. That is a lot of
+        // objects carrying one piece of information: the critique for it was
+        // "object count tinggi ≠ visual detail tinggi", and a roofline repeated
+        // forty times is the purest form of it.
+        //
+        // Four characters, chosen from the block's own x so a given city keeps
+        // its roofs across every repaint without another seeded stream.
         g.fillStyle = s.fill;
-        for (let k = 0; k < 3; k++) {
-          g.fillRect(Math.round(ux + uw * (0.2 + k * 0.3)), b.top - 7, 3, 7);
+        const roof = Math.floor(rand(Math.round(b.x) * 13 + 7) * 4);
+        if (roof === 0) {
+          // Chimney pots. Terraces without them read as filing cabinets.
+          for (let k = 0; k < 3; k++) {
+            g.fillRect(Math.round(ux + uw * (0.2 + k * 0.3)), b.top - 7, 3, 7);
+          }
+        } else if (roof === 1) {
+          // A flagstaff with its yard. The one roof object that breaks the
+          // skyline's ceiling with a vertical thinner than a spire.
+          g.fillRect(ucx - 1, b.top - 16, 2, 16);
+          g.fillRect(ucx - 4, b.top - 13, 9, 2);
+        } else if (roof === 2) {
+          // A roof shed — the stair head, which every flat roof you can walk on
+          // actually has. Its lean-to catches the sky on one side only.
+          const sw2 = Math.max(8, Math.round(uw * 0.26));
+          const sx2 = Math.round(ux + uw * 0.18);
+          g.fillRect(sx2, b.top - 10, sw2, 10);
+          g.fillStyle = s.lit;
+          g.fillRect(sx2, b.top - 11, sw2, 1);
+          g.fillStyle = s.fill;
+        } else {
+          // Ventilator cowls, a short row of them.
+          for (let k = 0; k < 4; k++) {
+            const vx = Math.round(ux + uw * (0.16 + k * 0.22));
+            g.fillRect(vx, b.top - 5, 2, 5);
+            g.fillRect(vx - 1, b.top - 7, 4, 2);
+          }
         }
-        // A water tank on the roof of the wider ones — the prop that says a
-        // flat roof is used rather than merely flat.
-        if (uw > 40) {
+
+        // The tank is now the wide block's ADDITION rather than its signature,
+        // so a broad roof reads as a roof with more on it instead of as the
+        // same roof again.
+        if (uw > 40 && roof !== 2) {
+          g.fillStyle = s.fill;
           g.fillRect(ucx - 6, b.top - 9, 12, 9);
           g.fillStyle = s.lit;
           g.fillRect(ucx - 6, b.top - 10, 12, 1);
@@ -769,6 +806,19 @@ export function drawSkyline(
         };
         course(b.top + 8, ux, uw);
         if (sb) course(sb.shoulder, b.x, b.w);
+        // A fire escape down one flank of the taller blocks. It is the
+        // cheapest thing on this roof and the most informational: a zig-zag on
+        // a wall says the building has floors people leave from, which a window
+        // grid on its own never quite does.
+        if (bh > 90 && uw > 34) {
+          g.fillStyle = s.ink;
+          const fx = roof % 2 === 0 ? ux + 4 : ux + uw - 12;
+          for (let fy = b.top + 26; fy < bot - 20; fy += 14) {
+            g.fillRect(fx, fy, 8, 2);
+            g.fillRect(roof % 2 === 0 ? fx + 6 : fx, fy + 2, 2, 12);
+          }
+        }
+
         // The plinth the whole thing stands on, in shadow.
         g.fillStyle = s.shade;
         g.fillRect(b.x, bot - 4, b.w, 4);

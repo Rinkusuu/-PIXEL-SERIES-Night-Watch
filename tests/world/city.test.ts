@@ -104,8 +104,13 @@ describe('every shape carries its own detail', () => {
    */
   // Every kind also carries ONE shadow-side band, painted clipped to the
   // silhouette before the details — it is in each count below.
-  const DETAIL_BLOCKS: Record<ShapeKind, number> = {
-    flat: 9,        // shade + three pots + two courses, each a band and a lip + plinth
+  // Not `Record<ShapeKind, number>`: `flat` is covered separately, below.
+  const DETAIL_BLOCKS: Partial<Record<ShapeKind, number>> = {
+    // `flat` is deliberately absent: its count is no longer fixed. A flat roof
+    // now picks one of four characters from its own x and a tall one also gets
+    // a fire escape, so the number varies by design — which is the point, since
+    // forty identical rooflines was a lot of objects carrying one fact. It is
+    // covered by its own test below instead.
     gable: 8,       // shade + three shingle courses + dormer face, lid, window + eaves
     spire: 9,       // shade + six crockets + cross shaft and arm
     dome: 10,       // shade + lantern, lid, spike + four ribs + band and its lip
@@ -116,8 +121,8 @@ describe('every shape carries its own detail', () => {
     gap: 0,         // nothing stands here; the slot is sky
   };
 
-  for (const kind of Object.keys(DETAIL_BLOCKS) as ShapeKind[]) {
-    it(`blocks ${DETAIL_BLOCKS[kind]} details on a ${kind}`, () => {
+  for (const [kind, want] of Object.entries(DETAIL_BLOCKS) as [ShapeKind, number][]) {
+    it(`blocks ${want} details on a ${kind}`, () => {
       let rects = 0;
       const g = new Proxy({} as CanvasRenderingContext2D, {
         get(_t, key) {
@@ -130,9 +135,49 @@ describe('every shape carries its own detail', () => {
         set: () => true,
       });
       drawSkyline(g, [{ kind, x: 40, w: 60, top: 100, stackX: 70 }], 460, style);
-      expect(rects).toBe(DETAIL_BLOCKS[kind]);
+      expect(rects).toBe(want);
     });
   }
+
+  it('gives a flat roof a different character depending on where it stands', () => {
+    // Four characters, chosen from the block's x. Two blocks far enough apart
+    // must not come out identical, or the variety is not reaching the picture.
+    const count = (x: number, top = 100) => {
+      let rects = 0;
+      const g = new Proxy({} as CanvasRenderingContext2D, {
+        get(_t, key) {
+          if (key === 'fillRect') return () => { rects++; };
+          if (key === 'createLinearGradient' || key === 'createRadialGradient') {
+            return () => ({ addColorStop: () => {} });
+          }
+          return () => {};
+        },
+        set: () => true,
+      });
+      drawSkyline(g, [{ kind: 'flat', x, w: 60, top }], 460, style);
+      return rects;
+    };
+    const seen = new Set([0, 37, 91, 140, 213, 288, 355, 420].map((x) => count(x)));
+    expect(seen.size, 'every roof came out the same').toBeGreaterThan(1);
+  });
+
+  it('never leaves a flat roof bare, whichever character it drew', () => {
+    for (const x of [0, 37, 91, 140, 213, 288, 355, 420]) {
+      let rects = 0;
+      const g = new Proxy({} as CanvasRenderingContext2D, {
+        get(_t, key) {
+          if (key === 'fillRect') return () => { rects++; };
+          if (key === 'createLinearGradient' || key === 'createRadialGradient') {
+            return () => ({ addColorStop: () => {} });
+          }
+          return () => {};
+        },
+        set: () => true,
+      });
+      drawSkyline(g, [{ kind: 'flat', x, w: 60, top: 100 }], 460, style);
+      expect(rects, `x=${x}`).toBeGreaterThan(5);
+    }
+  });
 
   it('never strokes a line anywhere in the city', () => {
     // This is the whole of the pixel look at the drawing level: one-pixel
