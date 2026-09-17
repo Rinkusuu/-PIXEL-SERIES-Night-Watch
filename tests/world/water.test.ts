@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { horizon } from '../../src/world/horizon';
 import {
   RING_LIMIT, advanceRing, createWater, mirrorRow, reflectAlpha, rowWobble,
-  stoneSkip,
+  stoneSkip, reflectBreak,
 } from '../../src/world/water';
 
 describe('mirrorRow', () => {
@@ -192,5 +192,36 @@ describe('stoneSkip', () => {
   it('is deterministic when the roll is given', () => {
     expect(stoneSkip(700, hz.waterTop + 30, hz, 0.42))
       .toEqual(stoneSkip(700, hz.waterTop + 30, hz, 0.42));
+  });
+});
+
+describe('reflectBreak', () => {
+  it('never gives a row back nothing at all', () => {
+    // A row that reflects zero reads as a hole punched in the river, not as a
+    // ripple. There is a floor for that reason.
+    for (let y = 0; y < 400; y++) {
+      const b = reflectBreak(y, 1234, 1);
+      expect(b, `y=${y}`).toBeGreaterThan(0.1);
+      expect(b, `y=${y}`).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('actually varies down the river, which is the whole point', () => {
+    // A straight row-for-row copy was the bug. If every row came back the same
+    // this function would be doing nothing.
+    const vals = Array.from({ length: 200 }, (_, y) => reflectBreak(y, 0, 1));
+    const lo = Math.min(...vals);
+    const hi = Math.max(...vals);
+    expect(hi - lo).toBeGreaterThan(0.4);
+  });
+
+  it('is dead still when motion is off, but not flat', () => {
+    // Frozen means frozen, not blank — the same rule the ripples follow.
+    expect(reflectBreak(40, 0, 0)).toBe(reflectBreak(40, 999_999, 0));
+    expect(reflectBreak(40, 0, 0)).not.toBe(reflectBreak(70, 0, 0));
+  });
+
+  it('moves with time when motion is on', () => {
+    expect(reflectBreak(40, 0, 1)).not.toBeCloseTo(reflectBreak(40, 3000, 1), 3);
   });
 });

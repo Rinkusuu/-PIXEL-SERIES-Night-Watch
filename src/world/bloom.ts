@@ -106,7 +106,11 @@ export function lampSpots(
     // averages exactly 1, so clustering costs no overall brightness.
     const wake = 0.15 + rand(c.block * 7 + 9001) * 1.70;
     if (rand(i + 1) >= frac * wake) continue;
-    out.push({ x: c.x, y: c.y, r: c.r, lit: true, kind: 'window' });
+    // Skewed LOW: most rooms are dim and a few are blazing, which is what a
+    // street of windows actually looks like. A flat spread would only move the
+    // uniformity from one value to a slightly noisier one.
+    const power = 0.4 + Math.pow(rand(i + 4242), 2.2) * 2.1;
+    out.push({ x: c.x, y: c.y, r: c.r, lit: true, kind: 'window', power });
   }
 
   // Gas standards on the bridge piers. These are the lights the river reflects
@@ -244,8 +248,16 @@ export function drawLamps(
     }
 
     const colour = lightColour(s.kind, v.glow);
-    glowBlob(g, s.x, s.y, rad * HALO[s.kind] * fx.haloScale, colour, ALPHA[s.kind]);
-    g.globalAlpha = 1;
+    const power = s.power ?? 1;
+    // The halo grows with the light and the core does not: a brighter room
+    // spills further through the glass, but the pane it spills through is the
+    // same size. Scaling both would just make some windows bigger.
+    glowBlob(
+      g, s.x, s.y,
+      rad * HALO[s.kind] * fx.haloScale * (0.6 + power * 0.5),
+      colour, Math.min(0.9, ALPHA[s.kind] * power),
+    );
+    g.globalAlpha = Math.min(1, 0.45 + power * 0.45);
     g.fillStyle = colour;
     g.fillRect(s.x - rad / 2, s.y - rad, Math.max(2, rad), rad * 2.4);
   }

@@ -165,6 +165,41 @@ export function drawSky(
   g.fillRect(0, 0, w, hz.cityBot);
   g.restore();
 
+  // 2b — the moon's body, BEFORE the cloud banks and before the skyline.
+  //
+  //      Two occlusions, and the order is the whole of both. The city is drawn
+  //      after `drawSky` returns, so the skyline stands in front of the moon on
+  //      its own. The clouds are drawn a few lines below this, so a bank can
+  //      now pass across its face — which it could not when the moon was drawn
+  //      last and sat on top of everything in the sky including the weather.
+  //
+  //      The wide corona is still drawn live by `drawLamps`, over the finished
+  //      plate, because that one belongs in front: it is moisture in the air
+  //      between you and everything else, and it genuinely does wash over the
+  //      near buildings as well as the far ones.
+  g.save();
+  g.globalCompositeOperation = 'lighter';
+  const tight = g.createRadialGradient(moon.x, moon.y, 0, moon.x, moon.y, moonR * 3.6);
+  tight.addColorStop(0, v.glow);
+  tight.addColorStop(1, 'transparent');
+  g.globalAlpha = 0.30 + v.lum * 0.1;
+  g.fillStyle = tight;
+  g.beginPath();
+  g.arc(moon.x, moon.y, moonR * 3.6, 0, Math.PI * 2);
+  g.fill();
+  g.restore();
+
+  // The disc itself is opaque, not additive: it is the brightest thing in the
+  // picture and the top of the value range, the same reason `MOON_DISC` is a
+  // fixed constant rather than an ambient role.
+  g.save();
+  g.globalAlpha = Math.min(1, 0.62 + v.lum * 0.3);
+  g.fillStyle = MOON_DISC;
+  g.beginPath();
+  g.arc(moon.x, moon.y, moonR, 0, Math.PI * 2);
+  g.fill();
+  g.restore();
+
   // 3 — cloud banks. Body a step toward the sky's own darkest stop, so they stay
   //     on the sky's scale instead of borrowing the depth ladder, which measures
   //     from the fog and has nothing to say about anything above it.
@@ -222,37 +257,5 @@ export function drawSky(
     g.fillRect(0, bankTop, w, bankBot - bankTop);
     g.restore();
   }
-  // 4 — the moon's body, LAST inside the sky and therefore still on the plate,
-  //     which means the skyline drawn after this occludes it.
-  //
-  //     It used to be drawn entirely by `drawLamps`, in the live pass, on top
-  //     of the finished plate — so the moon floated in FRONT of the city it is
-  //     supposed to be a quarter of a million miles behind. The wide corona
-  //     stays live and additive, because that is moisture in the air between
-  //     you and everything else and it genuinely does wash over the buildings;
-  //     the hard disc and its tight halo belong back here, behind the stone.
-  g.save();
-  g.globalCompositeOperation = 'lighter';
-  const tight = g.createRadialGradient(moon.x, moon.y, 0, moon.x, moon.y, moonR * 3.6);
-  tight.addColorStop(0, v.glow);
-  tight.addColorStop(1, 'transparent');
-  g.globalAlpha = 0.30 + v.lum * 0.1;
-  g.fillStyle = tight;
-  g.beginPath();
-  g.arc(moon.x, moon.y, moonR * 3.6, 0, Math.PI * 2);
-  g.fill();
-  g.restore();
-
-  // The disc itself is opaque, not additive: it is the brightest thing in the
-  // picture and the top of the value range, the same reason `MOON_DISC` is a
-  // fixed constant rather than an ambient role.
-  g.save();
-  g.globalAlpha = Math.min(1, 0.62 + v.lum * 0.3);
-  g.fillStyle = MOON_DISC;
-  g.beginPath();
-  g.arc(moon.x, moon.y, moonR, 0, Math.PI * 2);
-  g.fill();
-  g.restore();
-
   g.restore();
 }

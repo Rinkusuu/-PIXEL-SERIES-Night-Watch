@@ -33,6 +33,16 @@ export type LampSpot = {
   r: number;
   lit: boolean;
   kind: 'window' | 'bridge' | 'street' | 'arc' | 'lantern' | 'moon';
+  /**
+   * How hard this one burns, around 1. Only the windows use it.
+   *
+   * Every lit window used to draw at exactly the same brightness, so a city of
+   * hundreds of them read as one texture at one value — the critique for it was
+   * "kotak kuning kecil, tidak ada variasi", and that is precisely what a flat
+   * alpha produces. A room with the lamp turned up and a room with one candle
+   * are both lit; they are not the same light.
+   */
+  power?: number;
 };
 
 /**
@@ -60,6 +70,37 @@ export function rowWobble(y: number, d: number, timeMs: number, motion: number):
   const t = timeMs / 1000;
   return Math.sin(y * 0.55 + t * 1.4) * (0.8 + d * 2.6)
        + Math.sin(y * 0.23 - t * 0.9) * (0.4 + d * 1.4);
+}
+
+/**
+ * How much of the world a given row of river gives back, 0 to 1.
+ *
+ * The reflection used to be a straight row-for-row copy of the plate with a
+ * couple of pixels of shear on it, fading smoothly toward your feet. Held up
+ * against real water that reads as a photograph sheared sideways: the giveaway
+ * is that EVERY row reflects equally well, so a building comes back as a
+ * building with a wobble rather than as a building the water has torn up.
+ *
+ * Water does not do that. It reflects in bands. A stretch of surface tilted
+ * toward you throws the sky back and shows almost nothing of the far bank; the
+ * stretch beside it is flat and mirrors hard. The edges between those bands are
+ * where a reflection actually breaks.
+ *
+ * Three detuned frequencies, so the bands never land on a repeating rhythm —
+ * the same reason the fog's lobes and the barge's reflection slices are
+ * detuned. The lowest frequency makes the wide quiet stretches; the highest
+ * chops their edges.
+ */
+export function reflectBreak(y: number, timeMs: number, motion: number): number {
+  const t = motion === 0 ? 0 : timeMs / 1000;
+  const slow = Math.sin(y * 0.041 + t * 0.35);
+  const mid = Math.sin(y * 0.130 - t * 0.62);
+  const fast = Math.sin(y * 0.310 + t * 1.10);
+  // Weighted so the slow term decides WHERE a band is and the fast one only
+  // roughens its edge. Mapped to 0..1 with a floor: a row that gives back
+  // nothing at all reads as a hole punched in the river, not as a ripple.
+  const n = slow * 0.55 + mid * 0.30 + fast * 0.15;
+  return 0.18 + 0.82 * Math.min(1, Math.max(0, (n + 1) / 2) ** 1.6);
 }
 
 export function advanceRing(r: Ring, dtMs: number): Ring {
@@ -216,10 +257,17 @@ export function createWater(seed = 777): Water {
           if (my < 0) break;
           const a = reflectAlpha(d);
           if (a < 0.02) break;
-          g.globalAlpha = a;
+          // Distance decides how MUCH is left; the break decides how much of
+          // that this particular row gives back. Multiplying them is what turns
+          // an even fade into water.
+          const bk = reflectBreak(y, timeMs, motion);
+          g.globalAlpha = a * bk;
+          // A broken row is also a displaced one — the surface that is not
+          // mirroring is the surface that is tilted, so it shears hardest.
+          const shear = rowWobble(y, d, timeMs, motion) * (1 + (1 - bk) * 2.4);
           g.drawImage(
             mirror, 0, my, w, 1,
-            Math.round(rowWobble(y, d, timeMs, motion)), y, w, step,
+            Math.round(shear), y, w, step,
           );
         }
         g.globalAlpha = 1;
@@ -317,6 +365,44 @@ export function createWater(seed = 777): Water {
       //     dropped into a drawing.
 
       g.restore();
+
+      // 5b — light falling ON the surface, from the lamps standing at your own
+      //      parapet.
+      //
+      //      These do not get a mirror column and cannot: a lamp on the near
+      //      rail reflects straight down, which is under the deck and off the
+      //      frame. What it actually does to the river is light the water in
+      //      front of it — a pool on the surface, not an image in it, and the
+      //      difference is why this is a separate pass from the glitter above.
+      //
+      //      Broken by the same `reflectBreak` the reflection uses, so the
+      //      spill ripples on the same water rather than on a private one.
+      g.globalCompositeOperation = 'lighter';
+      for (const lamp of lamps) {
+        if (!lamp.lit) continue;
+        if (lamp.kind !== 'street' && lamp.kind !== 'lantern' && lamp.kind !== 'arc') continue;
+        const cold = lamp.kind === 'arc';
+        g.fillStyle = cold ? ARC_LIGHT : v.glow;
+        // Reaches from the near bank up the river, fading fast. The lantern is
+        // the brightest thing on the parapet, so it reaches furthest.
+        const reach = depth * (lamp.kind === 'lantern' ? 0.62 : 0.4);
+        const wide = lamp.r * (cold ? 7 : 11);
+        for (let y = bot - 1; y > bot - reach; y -= 2) {
+          const up = (bot - y) / reach;
+          // Light on water spreads as it goes: the far edge of a pool is wider
+          // and weaker than the near edge.
+          const halfW = wide * (0.45 + up * 1.5);
+          const fade = (1 - up) ** 2;
+          const bk = reflectBreak(y, timeMs, motion);
+          const a = fade * bk * (cold ? 0.10 : 0.13);
+          if (a < 0.006) continue;
+          g.globalAlpha = a;
+          const sway = rowWobble(y, up, timeMs, motion) * 0.6;
+          g.fillRect(lamp.x - halfW + sway, y, halfW * 2, 2);
+        }
+      }
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = 'source-over';
 
       // 6a — moored craft. The river had exactly one boat on it and that boat
       //      was only there for ninety seconds every fifteen minutes; the rest
