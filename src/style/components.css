@@ -592,3 +592,40 @@
    marking it is the em dash a ledger entry starts with. */
 .notes__line { padding: 1px 0; }
 .notes__line::before { content: '— '; color: var(--acc-brass); }
+
+/* ── Hours of the night ──────────────────────────────────────────────────── */
+/* Twenty-four bars on the same 4px grid as everything else, sharing the heat
+   grid's four bands of ink so the panel teaches one scale rather than two. */
+.hours__title { margin-top: var(--px3); }
+.hours {
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  align-items: end;
+  gap: 2px;
+  height: 40px;
+  /* Fills its column. The 460px cap belongs to the heat grid, which is thirty
+     cells that have to stay square; these are bars and have no such duty. */
+  margin: var(--px) 0 0;
+}
+.hours__bar {
+  /* The floor is 2px, not 0: an hour with nothing in it still has to hold its
+     place in the clock, exactly as an empty night does in the grid above. */
+  height: max(2px, var(--h, 0%));
+  background: var(--amb-ink);
+  opacity: 0.14;
+}
+.hours__bar[data-band='1'] { background: var(--amb-glow); opacity: 0.3; }
+.hours__bar[data-band='2'] { background: var(--amb-glow); opacity: 0.5; }
+.hours__bar[data-band='3'] { background: var(--amb-glow); opacity: 0.72; }
+.hours__bar[data-band='4'] {
+  background: var(--amb-glow);
+  opacity: 1;
+  box-shadow: 0 0 var(--px2) color-mix(in oklab, var(--amb-glow) 55%, transparent);
+}
+.hours__axis {
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  gap: 2px;
+  margin-bottom: var(--px2);
+}
+.hours__axis .label { font-size: 0.7em; opacity: 0.6; }

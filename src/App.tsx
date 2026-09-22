@@ -167,6 +167,8 @@ export function App() {
           <TheLedger
             rows={nw.ledger}
             grid={nw.nightsGrid}
+            hours={nw.hours}
+            peakHour={nw.peakHour}
             quarryTotals={nw.quarryTotals}
             streak={nw.streak}
             best={nw.best}

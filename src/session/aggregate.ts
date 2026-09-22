@@ -1,5 +1,5 @@
 import type { SessionRecord } from '../store/schema';
-import { nightKey } from './streak';
+import { NIGHT_BOUNDARY_HOUR, nightKey } from './streak';
 
 const DAY = 86_400_000;
 
@@ -95,4 +95,70 @@ export function minutesByQuarry(sessions: readonly SessionRecord[]): Record<stri
     totals[s.quarryId] = (totals[s.quarryId] ?? 0) + s.minutes;
   }
   return totals;
+}
+
+/**
+ * Which hours of the night your watches actually happen in.
+ *
+ * The heat grid answers "which nights did I keep"; nothing answered "when".
+ * Ninety days of start times were already in the store and nobody had ever
+ * read the time-of-day out of them.
+ *
+ * A watch is spread across the hours it OCCUPIED, not filed under the hour it
+ * began. At fifty minutes a watch crosses an hour boundary more often than not,
+ * and counting the whole thing against 20:00 because that is when you pressed
+ * start would put an hour of work in a clock position you were not working in.
+ * The cheap version of this chart is the version that lies.
+ *
+ * Returned starting at `NIGHT_BOUNDARY_HOUR`, so the row reads as one night
+ * from end to end instead of splitting yours in half at midnight — the same
+ * boundary `nightKey` uses, for the same reason.
+ */
+export function minutesByHour(
+  sessions: readonly SessionRecord[],
+): { hour: number; minutes: number }[] {
+  const bucket = new Array<number>(24).fill(0);
+
+  for (const s of sessions) {
+    if (!Number.isFinite(s.minutes) || s.minutes <= 0) continue;
+    // A day and a half. Nothing legitimate reaches it — `HUNT_RANGE` caps a
+    // watch at two hours — so this is only here to stop one corrupt record
+    // from spinning the loop forever.
+    let left = Math.min(s.minutes, 2160);
+    let cursor = s.startedAt;
+
+    while (left > 0) {
+      const at = new Date(cursor);
+      // Local hours throughout, walked forward rather than computed: an hour
+      // that repeats or vanishes at a DST change then simply gets the minutes
+      // the clock says it got.
+      const room = 60 - at.getMinutes();
+      const take = Math.min(left, room);
+      bucket[at.getHours()] = bucket[at.getHours()]! + take;
+      left -= take;
+      cursor += take * 60_000;
+    }
+  }
+
+  return Array.from({ length: 24 }, (_, i) => {
+    const hour = (NIGHT_BOUNDARY_HOUR + i) % 24;
+    return { hour, minutes: bucket[hour]! };
+  });
+}
+
+/**
+ * The hour with the most minutes in it, or null when there is nothing to rank.
+ *
+ * Ties go to the EARLIER hour in the night's order, which is the order the row
+ * above is in — so the number under the chart always names a bar you can see
+ * without counting from the wrong end.
+ */
+export function bestHour(
+  byHour: readonly { hour: number; minutes: number }[],
+): { hour: number; minutes: number } | null {
+  let best: { hour: number; minutes: number } | null = null;
+  for (const h of byHour) {
+    if (h.minutes > 0 && (best === null || h.minutes > best.minutes)) best = h;
+  }
+  return best;
 }

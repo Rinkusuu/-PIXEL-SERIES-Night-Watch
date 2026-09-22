@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { Button } from '../components/Button';
 import { Meter } from '../components/Meter';
 import { Panel } from '../components/Panel';
@@ -25,6 +26,7 @@ function band(minutes: number, peak: number): number {
 
 export function TheLedger({
   rows, grid, quarryTotals, streak, best, totals, days, notes, view, onToggleView,
+  hours, peakHour,
 }: {
   rows: readonly { key: string; minutes: number }[];
   grid: readonly { key: string; minutes: number }[];
@@ -34,6 +36,9 @@ export function TheLedger({
   totals: { minutes: number; nights: number };
   days: number;
   notes: readonly string[];
+  /** 24 entries, already in the night's own order. The view does not reorder. */
+  hours: readonly { hour: number; minutes: number }[];
+  peakHour: { hour: number; minutes: number } | null;
   /** Lifted, so the palette can switch it too — one source, not two. */
   view: 'week' | 'window';
   onToggleView: () => void;
@@ -41,6 +46,9 @@ export function TheLedger({
   const empty = totals.minutes === 0;
   const peak = Math.max(60, ...rows.map((r) => r.minutes));
   const gridPeak = Math.max(60, ...grid.map((r) => r.minutes));
+  // Its own peak: an hour's total is a fraction of a night's, so sharing the
+  // grid's scale would flatten this chart to nothing.
+  const hourPeak = Math.max(30, ...hours.map((h) => h.minutes));
 
   return (
     <Panel
@@ -82,6 +90,53 @@ export function TheLedger({
                 {COPY.ledger.best(best)} · {COPY.ledger.window(totals.minutes, totals.nights, days)}
               </p>
             </div>
+
+            {/* Its own column, not stacked under the heat grid.
+                The panel's grid row is a HARD height — `App.tsx` measures its
+                top edge to place the balustrade, so the row cannot grow — which
+                means anything added below scrolls out of sight, and the answer
+                this chart exists to give was the first thing to go. The panel
+                is full width and had two columns in it; the room was already
+                there sideways.
+
+                The heat grid says which nights were kept; this says when in
+                them the work happened — the one question ninety days of start
+                times could answer and nothing was asking. Same four bands as
+                the grid, because a second scale of ink in one panel is a second
+                thing to learn. */}
+            <div>
+              <p className="label">{COPY.ledger.hours}</p>
+              <div className="hours" role="img" aria-label={COPY.ledger.hoursLabel}>
+                {hours.map((h) => (
+                  <i
+                    key={h.hour}
+                    className="hours__bar"
+                    data-band={band(h.minutes, hourPeak)}
+                    // The bar's HEIGHT carries the number and the band carries
+                    // the rank. Height alone at this size cannot separate ten
+                    // minutes from twenty; band alone throws away everything
+                    // between the four steps.
+                    style={{ '--h': `${Math.round((h.minutes / hourPeak) * 100)}%` } as CSSProperties}
+                    title={`${COPY.ledger.hourName(h.hour)} · ${h.minutes}m`}
+                  />
+                ))}
+              </div>
+              <div className="hours__axis">
+                {hours.map((h) => (
+                  // Every fourth hour is named. Twenty-four labels in this width
+                  // is a grey smear; six is a clock you can read.
+                  <span key={h.hour} className="label">
+                    {h.hour % 4 === 0 ? COPY.ledger.hourName(h.hour).slice(0, 2) : ''}
+                  </span>
+                ))}
+              </div>
+              <p className="label">
+                {peakHour
+                  ? COPY.ledger.bestHour(peakHour.hour, peakHour.minutes)
+                  : COPY.ledger.noHours}
+              </p>
+            </div>
+
             <div>
               {/* What the watch saw, newest last. No badge, no toast, no
                   count against a total — a total would turn a logbook into a

@@ -118,8 +118,15 @@ export const COPY = {
       `${Math.round(m / 60)} jam · ${nights} dari ${days} malam`,
     heatLabel: (days: number, nights: number) =>
       `${nights} malam berjaga dari ${days} malam terakhir`,
+    hours: 'jam terkuat',
+    hoursLabel: 'menit berjaga menurut jam, sepanjang malam',
+    /** `04` reads as an hour; `4` reads as a count. */
+    hourName: (h: number) => `${String(h).padStart(2, '0')}:00`,
+    bestHour: (h: number, m: number) =>
+      `paling kuat pukul ${String(h).padStart(2, '0')}:00 · ${m}m terkumpul di sana`,
+    noHours: 'belum cukup jaga untuk tahu jam terkuatmu.',
   },
-  keys: 'spasi: mulai/henti · s: lewati · ,: pengaturan',
+  keys: 'spasi: mulai/henti · h: tahan · s: lewati · ,: pengaturan',
   labels: {
     start: 'MULAI',
     stop: 'HENTI',

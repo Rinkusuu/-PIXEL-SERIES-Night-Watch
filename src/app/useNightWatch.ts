@@ -9,7 +9,7 @@ import {
   type SessionEvent, type SessionState,
 } from '../session/machine';
 import {
-  bestStreak, minutesByNight, minutesByQuarry, nightGrid, windowTotals,
+  bestHour, bestStreak, minutesByHour, minutesByNight, minutesByQuarry, nightGrid, windowTotals,
 } from '../session/aggregate';
 import { streakLength } from '../session/streak';
 import { notesForWatch, record } from '../session/notes';
@@ -63,6 +63,14 @@ export function useNightWatch() {
   const nightsGrid = useMemo(
     () => nightGrid(data.sessions, now, RETENTION_DAYS), [data.sessions, now],
   );
+  /**
+   * Time-of-day, from the whole retained window rather than the last week:
+   * seven nights is not enough shape to name an hour from, and the store is
+   * already keeping ninety.
+   */
+  const hours = useMemo(() => minutesByHour(data.sessions), [data.sessions]);
+  const peakHour = useMemo(() => bestHour(hours), [hours]);
+
   const best = useMemo(
     () => bestStreak(data.sessions, now, RETENTION_DAYS), [data.sessions, now],
   );
@@ -486,7 +494,7 @@ export function useNightWatch() {
 
   return {
     session, values, progress, motion, grades, data, remainingMs, streak, ledger, weather,
-    nightsGrid, best, totals, quarryTotals, retentionDays: RETENTION_DAYS,
+    nightsGrid, best, totals, quarryTotals, hours, peakHour, retentionDays: RETENTION_DAYS,
     tonight: tonightStats,
     recovered: boot.recovered, actions,
   };
