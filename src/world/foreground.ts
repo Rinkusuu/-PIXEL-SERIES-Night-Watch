@@ -169,29 +169,67 @@ function gasStandard(g: CanvasRenderingContext2D, w: number, hz: Horizon): void 
     g.fill();
   }
 
-  // Bracket arm, curving inward to carry the lantern.
+  // Bracket arm, curving inward to carry the lantern. Filled, not stroked —
+  // the arm is a cast-iron scroll with a thickness, and a stroke is the one
+  // thing this layer never uses (see the note on `gatePier`).
   const anchor = lanternAnchor(w, hz);
-  g.lineWidth = 4;
+  const armEndY = anchor.y - 22;
   g.beginPath();
-  g.moveTo(cx, top + 6);
-  g.quadraticCurveTo(cx + (anchor.x - cx) * 0.55, top - 6, anchor.x, anchor.y - 18);
-  g.stroke();
+  g.moveTo(cx - 2, top + 6);
+  g.quadraticCurveTo(cx + (anchor.x - cx) * 0.55, top - 8, anchor.x + 2, armEndY);
+  g.lineTo(anchor.x - 2, armEndY);
+  g.quadraticCurveTo(cx + (anchor.x - cx) * 0.55, top - 2, cx + 3, top + 6);
+  g.closePath();
+  g.fill();
 
-  // Lantern housing: a tapered glass box under the arm. The flame itself is
-  // drawn by bloom.ts, which reads `lanternAnchor` for exactly this reason.
+  /* ── The lantern ───────────────────────────────────────────────────────────
+     A FRAME, not a box.
+
+     This was a solid tapered slab, and the vignette is drawn last — after the
+     bloom pass — so the slab painted straight over its own flame. The light was
+     never visible; all you ever saw was the halo leaking past the outline,
+     which is why it read as a bucket on a stick with a spotlight under it.
+
+     The addendum's rule is that an emissive thing is a HOLE in the layer in
+     front of it. So the glass is left open and only the ironwork is drawn: four
+     corner posts, a rail top and bottom, and one astragal across the middle.
+     The flame `bloom.ts` already put at `lanternAnchor` now shows through the
+     panes it is supposed to be behind. */
+  const lx = anchor.x;
+  const gTop = anchor.y - 15;
+  const gBot = anchor.y + 12;
+  const halfTop = 9;
+  const halfBot = 7;
+
+  // Corner posts, splayed with the taper so the cage reads as a truncated
+  // pyramid rather than as a rectangle with a lid.
+  for (const sgn of [-1, 1]) {
+    for (let y = gTop; y < gBot; y++) {
+      const t = (y - gTop) / (gBot - gTop);
+      const half = halfTop + (halfBot - halfTop) * t;
+      g.fillRect(Math.round(lx + sgn * half) - (sgn < 0 ? 0 : 2), y, 2, 1);
+    }
+  }
+  // Rails and the one astragal. Three horizontals is a glazed lantern; two is
+  // a crate.
+  g.fillRect(lx - halfTop, gTop, halfTop * 2, 2);
+  g.fillRect(lx - halfBot - 1, gBot - 2, (halfBot + 1) * 2, 3);
+  const midY = Math.round(gTop + (gBot - gTop) * 0.55);
+  g.fillRect(lx - 8, midY, 16, 1);
+
+  // The cap: a vented crown with a finial. A gas lantern has to breathe or the
+  // flame smothers, and the vent is the detail that says the thing burns.
   g.beginPath();
-  g.moveTo(anchor.x - 9, anchor.y - 16);
-  g.lineTo(anchor.x + 9, anchor.y - 16);
-  g.lineTo(anchor.x + 7, anchor.y + 12);
-  g.lineTo(anchor.x - 7, anchor.y + 12);
+  g.moveTo(lx - 11, gTop);
+  g.lineTo(lx, gTop - 9);
+  g.lineTo(lx + 11, gTop);
   g.closePath();
   g.fill();
-  g.beginPath();
-  g.moveTo(anchor.x - 11, anchor.y - 16);
-  g.lineTo(anchor.x, anchor.y - 27);
-  g.lineTo(anchor.x + 11, anchor.y - 16);
-  g.closePath();
-  g.fill();
+  g.fillRect(lx - 13, gTop - 2, 26, 3);
+  g.fillRect(lx - 1, gTop - 14, 2, 6);
+
+  // The drip pan under the glass, where the arm's bracket bolts on.
+  g.fillRect(lx - halfBot - 3, gBot + 1, (halfBot + 3) * 2, 2);
 }
 
 function railFinials(g: CanvasRenderingContext2D, w: number, hz: Horizon): void {
