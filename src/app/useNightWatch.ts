@@ -395,6 +395,26 @@ export function useNightWatch() {
       save(next);
       return next;
     }),
+    /**
+     * Write the night book.
+     *
+     * An empty entry DELETES the key rather than storing `''`. The difference
+     * is visible: `nightsWritten` counts keys, the transfer merge tests for
+     * absence, and a map full of empty strings would report every night you
+     * ever opened as a night you wrote about.
+     */
+    writeLog: (night: string, text: string) => setData((d) => {
+      const trimmed = text.trim();
+      const had = d.log[night];
+      if (had === undefined && trimmed === '') return d;
+      if (had === trimmed) return d;
+      const log = { ...d.log };
+      if (trimmed === '') delete log[night];
+      else log[night] = trimmed;
+      const next: Schema = { ...d, log };
+      save(next);
+      return next;
+    }),
     renameQuarry: (id: string, name: string) => setData((d) => {
       const trimmed = name.trim();
       // An empty rename is a cancelled rename, not a request for a nameless

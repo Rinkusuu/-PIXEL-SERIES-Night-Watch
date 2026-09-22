@@ -23,15 +23,36 @@ describe('weatherFor', () => {
     expect(seen.size).toBeGreaterThan(1);
   });
 
-  it('lands near the intended weights over a thousand nights', () => {
-    const tally: Record<string, number> = { clear: 0, fog: 0, rain: 0, fullmoon: 0 };
-    for (let i = 0; i < 1000; i++) tally[weatherFor(`k${i}`)]!++;
-    expect(tally.clear! / 1000).toBeGreaterThan(0.30);
-    expect(tally.clear! / 1000).toBeLessThan(0.50);
-    expect(tally.fullmoon! / 1000).toBeGreaterThan(0.04);
-    expect(tally.fullmoon! / 1000).toBeLessThan(0.17);
-    expect(tally.rain!).toBeGreaterThan(0);
-    expect(tally.fog!).toBeGreaterThan(0);
+  /**
+   * Sampled over REAL night keys across three whole years.
+   *
+   * This fed `k0`..`k999`, which are not night keys — and once the odds became
+   * seasonal, `seasonOf` could not read a month out of them and every one of
+   * the thousand draws fell through to the same table. The test then measured
+   * one season and called it the year, and it failed for being right.
+   *
+   * The per-season shape is checked properly in `season.test.ts`. What is left
+   * for here is the whole year: still varied, and no outcome running away with
+   * it.
+   */
+  it('lands near the intended weights over three whole years', () => {
+    const tally: Record<string, number> = { clear: 0, fog: 0, rain: 0, snow: 0, fullmoon: 0 };
+    let n = 0;
+    for (const y of [2025, 2026, 2027]) {
+      for (let m = 1; m <= 12; m++) {
+        for (let d = 1; d <= 28; d++) {
+          tally[weatherFor(`${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`)]!++;
+          n++;
+        }
+      }
+    }
+    expect(tally.clear! / n).toBeGreaterThan(0.25);
+    expect(tally.clear! / n).toBeLessThan(0.50);
+    // The one weight that is the same in every season, so it is the one the
+    // year as a whole can be held to tightly.
+    expect(tally.fullmoon! / n).toBeGreaterThan(0.05);
+    expect(tally.fullmoon! / n).toBeLessThan(0.16);
+    for (const w of ['rain', 'fog', 'snow']) expect(tally[w]!).toBeGreaterThan(0);
   });
 });
 

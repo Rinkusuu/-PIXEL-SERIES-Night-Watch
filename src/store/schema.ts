@@ -81,6 +81,19 @@ export type Schema = {
   /** Ids from `session/notes.ts`. What the watch has seen, in the order seen. */
   notes: string[];
   /**
+   * The night book: one entry per night, keyed by `nightKey`.
+   *
+   * Not a task list — `quarry` is that, and it is a list of things you mean to
+   * do. This is what actually happened: what stuck, what did not, what you
+   * would tell yourself tomorrow. The ledger could say a night was fifty
+   * minutes long and never why they were hard.
+   *
+   * A map rather than a list, because a night has exactly one entry and the
+   * key you look it up by is the key everything else here is already sorted
+   * on. Empty nights are absent rather than stored as `''`.
+   */
+  log: Record<string, string>;
+  /**
    * The watch that was running when the tab last went away, or null.
    *
    * Everything else here is a record of what already happened; this is the one
@@ -97,6 +110,7 @@ export function emptySchema(): Schema {
     quarry: [],
     sessions: [],
     notes: [],
+    log: {},
     running: null,
     settings: {
       huntMinutes: 50,

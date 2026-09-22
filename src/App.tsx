@@ -227,6 +227,8 @@ export function App() {
             grid={nw.nightsGrid}
             hours={nw.hours}
             peakHour={nw.peakHour}
+            log={nw.data.log}
+            onWriteLog={nw.actions.writeLog}
             quarryTotals={nw.quarryTotals}
             streak={nw.streak}
             best={nw.best}

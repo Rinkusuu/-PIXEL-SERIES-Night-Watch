@@ -85,6 +85,28 @@ export function fromTransfer(raw: string, mine: Schema): ImportResult {
 
   const notes = new Set([...mine.notes, ...(Array.isArray(incoming.notes) ? incoming.notes : [])]);
 
+  /*
+   * The night book. A night the reader has nothing for takes theirs; a night
+   * both wrote keeps the LONGER entry.
+   *
+   * Free text is the one thing here that cannot be merged honestly — there is
+   * no `startedAt` to match on and no total to take the larger of. Every
+   * automatic rule can lose something. This one was chosen because it is
+   * idempotent: importing the same file twice, or importing back and forth
+   * between two machines, settles instead of growing. Concatenating would
+   * duplicate on the second import, and taking the reader's would silently
+   * drop the other machine's whole book.
+   */
+  const log: Record<string, string> = { ...mine.log };
+  const theirs = incoming.log;
+  if (theirs !== null && typeof theirs === 'object' && !Array.isArray(theirs)) {
+    for (const [night, text] of Object.entries(theirs)) {
+      if (typeof text !== 'string' || text === '') continue;
+      const have = log[night];
+      if (have === undefined || text.length > have.length) log[night] = text;
+    }
+  }
+
   return {
     ok: true,
     added: add.length,
@@ -94,6 +116,7 @@ export function fromTransfer(raw: string, mine: Schema): ImportResult {
       sessions: [...mine.sessions, ...add].sort((a, b) => a.startedAt - b.startedAt),
       quarry: [...quarryById.values()],
       notes: [...notes],
+      log,
       // Settings stay the reader's. They describe this machine — how long you
       // like to work, whether this browser may notify you — not the ledger.
       settings: mine.settings,

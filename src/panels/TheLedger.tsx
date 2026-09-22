@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Button } from '../components/Button';
 import { Meter } from '../components/Meter';
 import { Panel } from '../components/Panel';
@@ -24,9 +24,65 @@ function band(minutes: number, peak: number): number {
   return Math.min(BANDS, Math.ceil((minutes / peak) * BANDS));
 }
 
+/**
+ * One night's entry.
+ *
+ * Saved on BLUR and on unmount rather than on every keystroke: a save writes
+ * the whole schema to localStorage and serialises ninety days of sessions to
+ * do it, and doing that per character is how a text box starts dropping
+ * letters. The unmount save is the one that matters — closing the book, or
+ * clicking another night, would otherwise throw away everything typed since
+ * the last blur.
+ */
+function NightBook({
+  night, text, onWrite, onClose,
+}: {
+  night: string;
+  text: string;
+  onWrite: (night: string, text: string) => void;
+  onClose: () => void;
+}) {
+  const [draft, setDraft] = useState(text);
+  // Read through a ref so the unmount effect can run with an empty dependency
+  // list and still see the last thing typed.
+  const latest = useRef({ night, draft });
+  latest.current = { night, draft };
+
+  // A different night is a different entry, not an edit of this one.
+  useEffect(() => { setDraft(text); }, [night, text]);
+
+  useEffect(() => () => {
+    const l = latest.current;
+    onWrite(l.night, l.draft);
+  }, []);
+
+  return (
+    <div className="book">
+      <div className="book__head">
+        <span className="label">{COPY.ledger.bookFor(night)}</span>
+        <Button onClick={onClose}>{COPY.ledger.bookClose}</Button>
+      </div>
+      <textarea
+        className="well book__text"
+        autoFocus
+        value={draft}
+        placeholder={COPY.ledger.bookPlaceholder}
+        aria-label={COPY.ledger.bookOpen(night)}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => onWrite(night, draft)}
+        // Escape closes; it does not discard. The unmount save has already run
+        // by the time anything else sees this, so there is no way to lose work
+        // by pressing the key that usually means "get me out of here".
+        onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+      />
+      <p className="label book__hint">{COPY.ledger.bookHint}</p>
+    </div>
+  );
+}
+
 export function TheLedger({
   rows, grid, quarryTotals, streak, best, totals, days, notes, view, onToggleView,
-  hours, peakHour,
+  hours, peakHour, log, onWriteLog,
 }: {
   rows: readonly { key: string; minutes: number }[];
   grid: readonly { key: string; minutes: number }[];
@@ -39,10 +95,16 @@ export function TheLedger({
   /** 24 entries, already in the night's own order. The view does not reorder. */
   hours: readonly { hour: number; minutes: number }[];
   peakHour: { hour: number; minutes: number } | null;
+  /** The night book, keyed by night. Absent keys are nights nobody wrote about. */
+  log: Readonly<Record<string, string>>;
+  onWriteLog: (night: string, text: string) => void;
   /** Lifted, so the palette can switch it too — one source, not two. */
   view: 'week' | 'window';
   onToggleView: () => void;
 }) {
+  /** Which night's book is open, or none. Lives here: it is a reading of the
+      grid, and nothing outside this panel has an opinion about it. */
+  const [open, setOpen] = useState<string | null>(null);
   const empty = totals.minutes === 0;
   const peak = Math.max(60, ...rows.map((r) => r.minutes));
   const gridPeak = Math.max(60, ...grid.map((r) => r.minutes));
@@ -83,7 +145,22 @@ export function TheLedger({
             <div>
               <div className="heat" role="img" aria-label={COPY.ledger.heatLabel(days, totals.nights)}>
                 {grid.map((n) => (
-                  <i key={n.key} className="heat__cell" data-band={band(n.minutes, gridPeak)} title={`${n.key} · ${n.minutes}m`} />
+                  /* A button, not an `<i>`. The cell was decoration; it is a
+                     control now, and a control the keyboard cannot reach is a
+                     control half the readers do not have. `data-written` marks
+                     the nights that have something in the book — otherwise the
+                     only way to find one is to click ninety cells. */
+                  <button
+                    key={n.key}
+                    type="button"
+                    className="heat__cell"
+                    data-band={band(n.minutes, gridPeak)}
+                    data-written={log[n.key] ? '' : undefined}
+                    aria-pressed={open === n.key}
+                    title={`${n.key} · ${n.minutes}m${log[n.key] ? ' · ✎' : ''}`}
+                    aria-label={COPY.ledger.bookOpen(n.key)}
+                    onClick={() => setOpen(open === n.key ? null : n.key)}
+                  />
                 ))}
               </div>
               <p className="label">
@@ -138,6 +215,20 @@ export function TheLedger({
             </div>
 
             <div>
+              {open !== null ? (
+                /* The book takes this column's place rather than being added
+                   below it. The panel's grid row is a HARD height — `App.tsx`
+                   measures its top edge to place the balustrade — so there is
+                   no room downward, and a night is only open because you asked
+                   for it, so nothing disappears unasked. */
+                <NightBook
+                  night={open}
+                  text={log[open] ?? ''}
+                  onWrite={onWriteLog}
+                  onClose={() => setOpen(null)}
+                />
+              ) : (
+              <>
               {/* What the watch saw, newest last. No badge, no toast, no
                   count against a total — a total would turn a logbook into a
                   checklist, and then the point of the thing is collecting it. */}
@@ -156,6 +247,8 @@ export function TheLedger({
                 </div>
               ))}
               {quarryTotals.length === 0 && <p className="label">{COPY.ledger.noQuarry}</p>}
+              </>
+              )}
             </div>
           </div>
         </>

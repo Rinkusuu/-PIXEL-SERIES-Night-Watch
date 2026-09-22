@@ -651,3 +651,47 @@
   background: var(--amb-accent);
   box-shadow: 0 0 var(--px2) color-mix(in oklab, var(--amb-accent) 50%, transparent);
 }
+
+/* ── The night book ──────────────────────────────────────────────────────── */
+.book { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.book__head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--px2); margin-bottom: var(--px);
+}
+.book__text {
+  flex: 1;
+  min-height: 72px;
+  border: 0;
+  resize: none;
+  color: var(--amb-ink);
+  padding: var(--px2);
+  font-family: var(--font-body);
+  font-size: var(--fs-small);
+  /* Pixel type has no descender room to spare at this size; 1.6 is what keeps
+     a second line from touching the first. */
+  line-height: 1.6;
+}
+.book__hint { margin-top: var(--px); opacity: 0.55; }
+
+/* A night with something written in it gets a mark, so a book entry can be
+   found without clicking ninety cells to look for it. A notch in the corner
+   rather than a colour: the four bands already own colour here, and a fifth
+   would have to mean something. */
+/* Full strength, and INSET. At 60% it disappeared against a band-4 cell, which
+   is the common case — most nights you write about are nights you worked. The
+   inset ring reads on a dark cell and on a lit one, because `--amb-lift` is the
+   pale end of the ladder and both bands sit below it. */
+.heat__cell[data-written] {
+  box-shadow: inset 0 0 0 1px var(--amb-lift);
+}
+/* The cells are buttons now. They were `<i>`, so they inherit nothing useful. */
+.heat__cell {
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  appearance: none;
+}
+.heat__cell[aria-pressed='true'] {
+  outline: 2px solid var(--amb-lift);
+  outline-offset: 0;
+}

@@ -130,6 +130,13 @@ export const COPY = {
     bestHour: (h: number, m: number) =>
       `paling kuat pukul ${String(h).padStart(2, '0')}:00 · ${m}m terkumpul di sana`,
     noHours: 'belum cukup jaga untuk tahu jam terkuatmu.',
+    book: 'buku malam',
+    bookFor: (night: string) => `buku malam · ${night.slice(5)}`,
+    bookHint: 'apa yang terjadi malam itu. tersimpan sendiri.',
+    bookPlaceholder: 'apa yang macet, apa yang akhirnya jalan…',
+    bookClose: 'TUTUP',
+    bookOpen: (night: string) => `buka buku malam ${night}`,
+    written: (n: number) => `${n} malam tertulis`,
   },
   keys: 'spasi: mulai/henti · h: tahan · s: lewati · ,: pengaturan',
   labels: {
