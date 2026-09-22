@@ -5,7 +5,7 @@ import { resolve } from '../ambient/interpolate';
 import { NIGHT_KEYS } from '../ambient/keyframes';
 import type { AmbientValues, GradeName } from '../ambient/types';
 import {
-  initialState, progressOf, reduce, remainingMs as remainingOf,
+  initialState, progressOf, reduce, remainingMs as remainingOf, resume, runningOf,
   type SessionEvent, type SessionState,
 } from '../session/machine';
 import {
@@ -29,9 +29,25 @@ const PRESSED_MS = 5 * 60_000;
 export function useNightWatch() {
   const boot = useMemo(() => load(), []);
   const [data, setData] = useState<Schema>(boot.data);
-  const [session, setSession] = useState<SessionState>(() =>
-    initialState(boot.data.settings.huntMinutes, boot.data.settings.respiteMinutes),
+  /**
+   * Boot picks the watch back up where it was left.
+   *
+   * `resume` is given the store's running watch and the wall clock, and returns
+   * either the watch still running or — if its phase ran out while the tab was
+   * gone — an idle state plus the record that should have been written. The
+   * record is applied in the effect below rather than here: this runs during
+   * render, and writing to the store from a `useState` initialiser is a side
+   * effect in the wrong place.
+   */
+  const revived = useMemo(
+    () => resume(
+      initialState(boot.data.settings.huntMinutes, boot.data.settings.respiteMinutes),
+      boot.data.running,
+      Date.now(),
+    ),
+    [boot],
   );
+  const [session, setSession] = useState<SessionState>(revived.state);
   const [now, setNow] = useState(() => Date.now());
   const [values, setValues] = useState<AmbientValues>(() =>
     resolve(NIGHT_KEYS, 0, gradesFor(['calm'])),
@@ -101,6 +117,62 @@ export function useNightWatch() {
 
   const alertsRef = useRef<Alerts>(data.settings.alerts);
   alertsRef.current = data.settings.alerts;
+
+  /**
+   * The watch that finished while nobody was here, written down once.
+   *
+   * It has to run after mount, and it has to be guarded: React mounts effects
+   * twice in development's strict mode, and a watch recorded twice is an hour
+   * that never happened.
+   */
+  const revivedApplied = useRef(false);
+  useEffect(() => {
+    if (revivedApplied.current) return;
+    revivedApplied.current = true;
+    const done = revived.completed;
+    setData((d) => {
+      const sessions = done ? [...d.sessions, done] : d.sessions;
+      const next: Schema = {
+        ...d,
+        sessions,
+        running: runningOf(revived.state),
+        ...(done ? {
+          notes: record(d.notes, notesForWatch({
+            minutes: done.minutes,
+            completed: true,
+            weather: weatherFor(nightKey(done.startedAt)),
+            streak: streakLength(sessions, Date.now()),
+            totalSessions: sessions.length,
+          })),
+          quarry: d.quarry.map((q) =>
+            q.id === done.quarryId ? { ...q, minutes: q.minutes + done.minutes } : q),
+        } : {}),
+      };
+      save(next);
+      return next;
+    });
+  }, [revived]);
+
+  /**
+   * And from here on, every change of phase is written down as it happens.
+   *
+   * Cheap: `running` is three fields, and this only fires when the phase or its
+   * start actually moves, not on every tick.
+   */
+  useEffect(() => {
+    const now2 = runningOf(session);
+    setData((d) => {
+      const was = d.running;
+      const same = was === now2
+        || (was !== null && now2 !== null
+            && was.phase === now2.phase && was.startedAt === now2.startedAt
+            && was.quarryId === now2.quarryId);
+      if (same) return d;
+      const next: Schema = { ...d, running: now2 };
+      save(next);
+      return next;
+    });
+  }, [session.phase, session.startedAt, session.quarryId]);
 
   // The rAF-free heartbeat: one tick a second is enough for a clock, and the
   // machine reads wall-clock time anyway.

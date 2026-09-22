@@ -48,7 +48,15 @@ export function load(storage: Storage = localStorage): { data: Schema; recovered
   // Same repair for `notes`: a store written before they existed has none, and
   // every reader expects an array.
   const notes = Array.isArray(parsed.notes) ? parsed.notes : [];
-  return { data: { ...parsed, settings, notes }, recovered: false };
+  // A store written before watches were resumable has no `running`, and a
+  // malformed one must not be handed to `resume()` as though it were a watch.
+  const r = (parsed as { running?: unknown }).running;
+  const running = r && typeof r === 'object'
+    && typeof (r as { startedAt?: unknown }).startedAt === 'number'
+    && ((r as { phase?: unknown }).phase === 'hunt' || (r as { phase?: unknown }).phase === 'respite')
+    ? (r as Schema['running'])
+    : null;
+  return { data: { ...parsed, settings, notes, running }, recovered: false };
 }
 
 export function save(

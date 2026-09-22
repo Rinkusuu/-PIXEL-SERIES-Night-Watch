@@ -1,3 +1,5 @@
+import type { RunningWatch } from '../session/machine';
+
 export const STORAGE_KEY = 'nightwatch:v1';
 export const CORRUPT_PREFIX = 'nightwatch:corrupt:';
 /** The Ledger needs 7 days, the streak needs the running chain. 90 gives room
@@ -58,6 +60,15 @@ export type Schema = {
   settings: Settings;
   /** Ids from `session/notes.ts`. What the watch has seen, in the order seen. */
   notes: string[];
+  /**
+   * The watch that was running when the tab last went away, or null.
+   *
+   * Everything else here is a record of what already happened; this is the one
+   * field describing something still in progress. It exists because the running
+   * session lived in React state alone, so a reload dropped it AND the minutes
+   * it had earned. See `resume()` in `session/machine.ts`.
+   */
+  running: RunningWatch | null;
 };
 
 export function emptySchema(): Schema {
@@ -66,6 +77,7 @@ export function emptySchema(): Schema {
     quarry: [],
     sessions: [],
     notes: [],
+    running: null,
     settings: {
       huntMinutes: 50,
       respiteMinutes: 10,
