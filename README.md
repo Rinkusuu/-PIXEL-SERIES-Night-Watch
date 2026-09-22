@@ -96,6 +96,30 @@ originally and both `@font-face` rules resolved to nothing for the whole life of
 the project: every face fell through to `ui-monospace`, silently, because
 `font-display: swap` is built to degrade without complaining.
 
+## Offline
+
+The app makes no network requests at all — the world is arithmetic and the
+ledger is `localStorage` — so once the shell is on disk there is nothing left to
+go wrong. `sw-template.js` precaches it; `vite.config.ts` fills in the real,
+content-hashed file list at build time, because a handwritten one is correct for
+exactly one build. Fonts and icons live in `public/`, so they are copied rather
+than bundled and have to be named explicitly; `tests/build/offline.test.ts`
+checks that list against what is actually on disk.
+
+Every cache lookup passes `ignoreVary: true`. A host that answers `Vary: Origin`
+— Vite's own preview server does — otherwise makes every lookup miss, because
+`addAll` stored its responses without an Origin header and the page's own
+subresource requests send one. The shell was entirely in the cache and the
+browser still refused it; offline the app booted to a blank page with the right
+title in the tab. It was found by killing the server, not by reading the code.
+
+Verified end to end: a watch started, the server killed mid-session, the page
+reloaded — both pixel faces loaded from cache, the canvas painted, no failed
+requests, and the clock had kept counting through the outage.
+
+There is no service worker in dev, on purpose. A cache-first worker in front of
+Vite's HMR is a machine for serving you yesterday's code.
+
 ## Testing policy
 
 Pure modules (`ambient/`, `session/`, `store/`, `app/`, `world/hatch`) are

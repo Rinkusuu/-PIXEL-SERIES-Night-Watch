@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" shape-rendering="crispEdges">
+  <!-- Maskable: everything that matters stays inside the middle 80%, because a
+       launcher may crop this to a circle or a squircle. -->
+  <rect width="64" height="64" fill="#0e1218"/>
+  <rect x="28" y="16" width="8" height="2" fill="#243039"/>
+  <rect x="31" y="13" width="2" height="4" fill="#243039"/>
+  <rect x="25" y="18" width="14" height="2" fill="#243039"/>
+  <rect x="26" y="20" width="2" height="21" fill="#243039"/>
+  <rect x="36" y="20" width="2" height="21" fill="#243039"/>
+  <rect x="28" y="21" width="8" height="19" fill="#ffb347"/>
+  <rect x="28" y="30" width="8" height="2" fill="#243039"/>
+  <rect x="25" y="41" width="14" height="3" fill="#243039"/>
+</svg>
