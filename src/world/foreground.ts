@@ -19,8 +19,18 @@ export const GATE_X = { left: 0.038, right: 0.962 } as const;
 export const STANDARD_X = 0.105;
 
 /** How far the bracket arm reaches inward from the shaft, in shaft widths. */
-const BRACKET_REACH = 3.2;
-const SHAFT_W = 9;
+const BRACKET_REACH = 3.4;
+/**
+ * Nine, before the ironwork arrived.
+ *
+ * The scroll and the crowned lantern below are not decoration that can be
+ * scaled down with the object: a volute needs enough pixels to turn in or it is
+ * a blob, and a three-tier cap needs three steps that can be told apart. This
+ * is the nearest object in the frame and the one the eye lands on first, so the
+ * room it takes is room well spent. The acanthus failed for exactly the
+ * opposite reason — detail asked of pixels that were not there.
+ */
+const SHAFT_W = 11;
 
 const GATE_BARS = 7;
 const GATE_PITCH = 11;
@@ -128,8 +138,10 @@ function gateLeaf(
   g.fillRect(railX, bot - 14, railW, 3);
 }
 
+type Pt = { x: number; y: number };
+
 /**
- * A tapered ribbon laid along a cubic Bézier, offset along the curve's NORMAL.
+ * A tapered ribbon laid along a centreline, offset along the curve's NORMAL.
  *
  * The naive way to give a curve thickness is to draw it twice with the second
  * copy nudged down a few pixels. That is only correct where the curve runs
@@ -138,40 +150,30 @@ function gateLeaf(
  * is measured perpendicular to the curve everywhere, so the width you ask for
  * is the width you see.
  *
- * `steps` is 24 because the arm is about a hundred pixels long and this layer
- * is a silhouette — the outline is the only channel it has, so a facet the eye
- * can catch is a real defect here in a way it would not be on the plate.
+ * The direction at each point comes from its NEIGHBOURS rather than from an
+ * analytic derivative, which is what lets one function serve both the neck's
+ * Bézier and the volute's spiral — and what makes it correct at the ends of
+ * either, where a one-sided difference is the only direction there is.
  */
-function scroll(
-  g: CanvasRenderingContext2D,
-  p0: { x: number; y: number },
-  c1: { x: number; y: number },
-  c2: { x: number; y: number },
-  p3: { x: number; y: number },
-  w0: number,
-  w1: number,
-  steps = 24,
+function ribbon(
+  g: CanvasRenderingContext2D, pts: readonly Pt[], w0: number, w1: number,
 ): void {
-  const near: { x: number; y: number }[] = [];
-  const far: { x: number; y: number }[] = [];
+  if (pts.length < 2) return;
+  const near: Pt[] = [];
+  const far: Pt[] = [];
 
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    const u = 1 - t;
-    const x = u * u * u * p0.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * p3.x;
-    const y = u * u * u * p0.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * p3.y;
-    // The derivative, for the tangent. Both ends of this curve have their
-    // control point directly above them, so the tangent there is vertical and
-    // the normal is horizontal — which is what makes the arm meet the shaft and
-    // the lantern squarely instead of at a slice.
-    const dx = 3 * u * u * (c1.x - p0.x) + 6 * u * t * (c2.x - c1.x) + 3 * t * t * (p3.x - c2.x);
-    const dy = 3 * u * u * (c1.y - p0.y) + 6 * u * t * (c2.y - c1.y) + 3 * t * t * (p3.y - c2.y);
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[Math.max(0, i - 1)]!;
+    const b = pts[Math.min(pts.length - 1, i + 1)]!;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
     const len = Math.hypot(dx, dy) || 1;
+    const t = i / (pts.length - 1);
     const half = (w0 + (w1 - w0) * t) / 2;
     const nx = (-dy / len) * half;
     const ny = (dx / len) * half;
-    near.push({ x: x + nx, y: y + ny });
-    far.push({ x: x - nx, y: y - ny });
+    near.push({ x: pts[i]!.x + nx, y: pts[i]!.y + ny });
+    far.push({ x: pts[i]!.x - nx, y: pts[i]!.y - ny });
   }
 
   g.beginPath();
@@ -180,6 +182,41 @@ function scroll(
   for (const p of far.reverse()) g.lineTo(p.x, p.y);
   g.closePath();
   g.fill();
+}
+
+/**
+ * `steps` is 26 because the neck is about a hundred pixels long and this layer
+ * is a silhouette — the outline is the only channel it has, so a facet the eye
+ * can catch is a real defect here in a way it would not be on the plate.
+ */
+function bezier(p0: Pt, c1: Pt, c2: Pt, p3: Pt, steps = 26): Pt[] {
+  return Array.from({ length: steps + 1 }, (_, i) => {
+    const t = i / steps;
+    const u = 1 - t;
+    return {
+      x: u * u * u * p0.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * p3.x,
+      y: u * u * u * p0.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * p3.y,
+    };
+  });
+}
+
+/**
+ * A spiral, for the wrought-iron volutes the reference brackets are built from.
+ *
+ * Radius shrinks as the angle turns, so the curl tightens the way hammered iron
+ * does — a constant-radius arc is a hook, not a scroll. One turn is the most
+ * that survives: at a second turn the arms of the spiral land within a pixel of
+ * each other and the whole thing fills in solid.
+ */
+function spiral(
+  at: Pt, a0: number, a1: number, r0: number, r1: number, steps = 22,
+): Pt[] {
+  return Array.from({ length: steps + 1 }, (_, i) => {
+    const t = i / steps;
+    const a = a0 + (a1 - a0) * t;
+    const r = r0 + (r1 - r0) * t;
+    return { x: at.x + Math.cos(a) * r, y: at.y + Math.sin(a) * r };
+  });
 }
 
 function gasStandard(g: CanvasRenderingContext2D, w: number, hz: Horizon): void {
@@ -195,9 +232,34 @@ function gasStandard(g: CanvasRenderingContext2D, w: number, hz: Horizon): void 
   g.closePath();
   g.fill();
 
-  // Base: stepped plinth.
-  g.fillRect(cx - SHAFT_W * 1.9, hz.deckTop - 14, SHAFT_W * 3.8, 14);
-  g.fillRect(cx - SHAFT_W * 2.4, hz.deckTop - 5, SHAFT_W * 4.8, 9);
+  // Base: a moulded plinth, not two stacked slabs. The reference posts all
+  // swell toward the ground through a torus and a step — a column that meets
+  // the pavement at a right angle reads as scaffolding.
+  const bw = (k: number) => SHAFT_W * k;
+  g.beginPath();
+  g.moveTo(cx - bw(1.1), hz.deckTop - 26);
+  g.lineTo(cx + bw(1.1), hz.deckTop - 26);
+  g.lineTo(cx + bw(1.8), hz.deckTop - 14);
+  g.lineTo(cx - bw(1.8), hz.deckTop - 14);
+  g.closePath();
+  g.fill();
+  g.fillRect(cx - bw(1.9), hz.deckTop - 15, bw(3.8), 6);
+  g.fillRect(cx - bw(2.4), hz.deckTop - 9, bw(4.8), 13);
+
+  // Knops: the cast collars a fluted shaft is broken into. Two of them, because
+  // an unbroken taper forty pixels tall is a pole, and the bands are the only
+  // thing at this scale that says the shaft was cast in sections.
+  //
+  // Width follows the taper rather than being fixed — a constant collar reads
+  // as thicker at the top of the post than at the bottom, which is backwards.
+  const shaftHalf = (y: number) =>
+    SHAFT_W / 2 + (SHAFT_W - SHAFT_W / 2) * ((y - top) / (hz.deckTop - top));
+  for (const f of [0.34, 0.66]) {
+    const y = top + (hz.deckTop - top) * f;
+    const half = shaftHalf(y);
+    g.fillRect(cx - half - 3, y, (half + 3) * 2, 3);
+    g.fillRect(cx - half - 1, y + 3, (half + 1) * 2, 2);
+  }
 
   // The lamplighter's ladder rest: a crossbar through the shaft, projecting
   // both sides, a little below the crown. It is the one piece of a gas standard
@@ -248,18 +310,58 @@ function gasStandard(g: CanvasRenderingContext2D, w: number, hz: Horizon): void 
   // for the voussoir ring. The control points sit directly above the two ends,
   // which is what forces both tangents vertical.
   const anchor = lanternAnchor(w, hz);
-  const armEndY = anchor.y - 22;
-  const apexY = top - 18;
-  scroll(
+  const armEndY = anchor.y - 26;
+  const apexY = top - 22;
+  const reach = anchor.x - cx;
+  ribbon(
     g,
-    { x: cx, y: top - 2 },
-    { x: cx, y: apexY - 4 },
-    { x: anchor.x, y: apexY },
-    { x: anchor.x, y: armEndY },
+    bezier(
+      { x: cx, y: top - 2 },
+      { x: cx, y: apexY - 5 },
+      { x: anchor.x, y: apexY },
+      { x: anchor.x, y: armEndY },
+    ),
     // Tapered, because cast iron is: the root carries the whole overhang and
     // the tip carries a lantern. An even ribbon reads as bent pipe.
-    7, 4,
+    8, 4,
   );
+
+  /* ── The scrollwork ───────────────────────────────────────────────────────
+     What the reference brackets actually are.
+
+     A plain ogee is a pipe bent twice. Every one of these lamps carries volutes
+     in the crotch — they are structural, bracing the overhang, and they are the
+     first thing the eye reads as WROUGHT rather than cast. Drawn as ribbons
+     along spirals, so they are the same kind of object as the neck itself and
+     taper into it instead of being stuck on.
+
+     One turn each and no more. At a second turn the arms of the spiral land
+     within a pixel of each other and the curl fills in solid — the acanthus
+     lesson again, in the one place where the detail does survive if it is asked
+     for honestly. */
+  /* One scroll that SPANS the arch, not a curl parked in the middle of it.
+
+     Three versions got here. A fat spiral centred twelve pixels off the post
+     swallowed the capital and the rest bar and read as a blob with a hole in
+     it. Thinning it and moving it clear fixed the blob and produced a shape
+     touching nothing at either end — which the eye read as a letter P hanging
+     in the gap, because an iron scroll that floats is not iron.
+
+     What the reference brackets actually are: ONE stroke springing off the
+     neck near the apex, sweeping down across the open triangle and tightening
+     into a volute beside the post. It fills the arch because it is welded to
+     both sides of it, and it tapers into the neck because it is the same kind
+     of object drawn the same way. */
+  // Stopped short of a full turn. Swept all the way round, the scroll's outer
+  // arc ran parallel to the neck above it and the two together closed into a
+  // ring — a monocle bolted to a post. A scroll is a C; the gap is what says
+  // which way the iron was bent.
+  const eye = { x: cx + reach * 0.36, y: top + 8 };
+  ribbon(g, spiral(eye, -Math.PI * 0.42, Math.PI * 0.80, 20, 3), 5, 1.5);
+  // The stub that welds the volute's eye back to the shaft. Short and level:
+  // everything else here curves, and one straight member is what makes the
+  // curves read as chosen rather than as the only thing the draughtsman knew.
+  g.fillRect(cx + 2, top + 6, reach * 0.36 - 2, 4);
 
   /* ── The lantern ───────────────────────────────────────────────────────────
      A FRAME, not a box.
@@ -275,40 +377,71 @@ function gasStandard(g: CanvasRenderingContext2D, w: number, hz: Horizon): void 
      The flame `bloom.ts` already put at `lanternAnchor` now shows through the
      panes it is supposed to be behind. */
   const lx = anchor.x;
-  const gTop = anchor.y - 15;
-  const gBot = anchor.y + 12;
-  const halfTop = 9;
-  const halfBot = 7;
+  const gTop = anchor.y - 18;
+  const gBot = anchor.y + 16;
+  const halfTop = 12;
+  const halfBot = 8;
 
   // Corner posts, splayed with the taper so the cage reads as a truncated
-  // pyramid rather than as a rectangle with a lid.
+  // pyramid rather than as a rectangle with a lid. The taper is the whole
+  // silhouette of a gas lantern — wide at the shoulder, narrow at the pan —
+  // and a straight-sided box reads as a tin.
+  const halfAt = (y: number) =>
+    halfTop + (halfBot - halfTop) * ((y - gTop) / (gBot - gTop));
   for (const sgn of [-1, 1]) {
     for (let y = gTop; y < gBot; y++) {
-      const t = (y - gTop) / (gBot - gTop);
-      const half = halfTop + (halfBot - halfTop) * t;
+      const half = halfAt(y);
       g.fillRect(Math.round(lx + sgn * half) - (sgn < 0 ? 0 : 2), y, 2, 1);
     }
   }
-  // Rails and the one astragal. Three horizontals is a glazed lantern; two is
-  // a crate.
-  g.fillRect(lx - halfTop, gTop, halfTop * 2, 2);
-  g.fillRect(lx - halfBot - 1, gBot - 2, (halfBot + 1) * 2, 3);
-  const midY = Math.round(gTop + (gBot - gTop) * 0.55);
-  g.fillRect(lx - 8, midY, 16, 1);
 
-  // The cap: a vented crown with a finial. A gas lantern has to breathe or the
-  // flame smothers, and the vent is the detail that says the thing burns.
+  // Glazing bars. One across and one down: four panes, which is what the
+  // reference lanterns are glazed as, and what makes the light read as coming
+  // through GLASS rather than out of a hole.
+  //
+  // One pixel each, and no more. The housing painting over its own flame is the
+  // fault this whole object was rebuilt to fix — see the note above — so every
+  // line laid across the glass has to earn the light it costs.
+  const midY = Math.round(gTop + (gBot - gTop) * 0.42);
+  g.fillRect(lx - Math.round(halfAt(midY)), midY, Math.round(halfAt(midY)) * 2, 1);
+  g.fillRect(lx, gTop, 1, gBot - gTop);
+
+  // The shoulder: a cornice that OVERHANGS the glass. Every lantern in the
+  // reference has one, and it is what stops the cap looking like a hat resting
+  // on the box — rain runs off an eave, not off a join.
+  g.fillRect(lx - halfTop - 3, gTop - 3, (halfTop + 3) * 2, 4);
+
+  // The crown, in three tiers. Not a single triangle: a gas lantern's cap is a
+  // stepped ogee with a vent under each step, because the flame has to breathe
+  // or it smothers, and the steps are the only part of that a silhouette can
+  // show.
+  for (const [dy, hgt, wide] of [[-9, 6, 10], [-13, 4, 6], [-16, 3, 3]] as const) {
+    g.beginPath();
+    g.moveTo(lx - wide - 2, gTop + dy + hgt);
+    g.lineTo(lx - wide, gTop + dy);
+    g.lineTo(lx + wide, gTop + dy);
+    g.lineTo(lx + wide + 2, gTop + dy + hgt);
+    g.closePath();
+    g.fill();
+  }
+
+  // No finial on top. There was one, and the neck came down through it: a
+  // hanging lantern has a bracket where a standing one has an ornament, and the
+  // reference photographs show exactly that — the scroll IS the top of it.
+
+  // The pan, and the drop finial under it. A lantern hangs; it needs a point at
+  // the bottom for the eye to hang it from, and without one the whole thing
+  // reads as sitting on an invisible shelf.
+  g.fillRect(lx - halfBot - 3, gBot, (halfBot + 3) * 2, 3);
   g.beginPath();
-  g.moveTo(lx - 11, gTop);
-  g.lineTo(lx, gTop - 9);
-  g.lineTo(lx + 11, gTop);
+  g.moveTo(lx - halfBot + 1, gBot + 3);
+  g.lineTo(lx + halfBot - 1, gBot + 3);
+  g.lineTo(lx + 2, gBot + 8);
+  g.lineTo(lx - 2, gBot + 8);
   g.closePath();
   g.fill();
-  g.fillRect(lx - 13, gTop - 2, 26, 3);
-  g.fillRect(lx - 1, gTop - 14, 2, 6);
-
-  // The drip pan under the glass, where the arm's bracket bolts on.
-  g.fillRect(lx - halfBot - 3, gBot + 1, (halfBot + 3) * 2, 2);
+  g.fillRect(lx - 2, gBot + 8, 4, 3);
+  g.fillRect(lx - 1, gBot + 11, 2, 3);
 }
 
 function railFinials(g: CanvasRenderingContext2D, w: number, hz: Horizon): void {
