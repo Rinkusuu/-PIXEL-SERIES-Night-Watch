@@ -128,6 +128,60 @@ function gateLeaf(
   g.fillRect(railX, bot - 14, railW, 3);
 }
 
+/**
+ * A tapered ribbon laid along a cubic Bézier, offset along the curve's NORMAL.
+ *
+ * The naive way to give a curve thickness is to draw it twice with the second
+ * copy nudged down a few pixels. That is only correct where the curve runs
+ * horizontally; everywhere else the nudge is measured in the wrong direction
+ * and the ribbon swells and pinches with the slope. Offsetting along the normal
+ * is measured perpendicular to the curve everywhere, so the width you ask for
+ * is the width you see.
+ *
+ * `steps` is 24 because the arm is about a hundred pixels long and this layer
+ * is a silhouette — the outline is the only channel it has, so a facet the eye
+ * can catch is a real defect here in a way it would not be on the plate.
+ */
+function scroll(
+  g: CanvasRenderingContext2D,
+  p0: { x: number; y: number },
+  c1: { x: number; y: number },
+  c2: { x: number; y: number },
+  p3: { x: number; y: number },
+  w0: number,
+  w1: number,
+  steps = 24,
+): void {
+  const near: { x: number; y: number }[] = [];
+  const far: { x: number; y: number }[] = [];
+
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const u = 1 - t;
+    const x = u * u * u * p0.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * p3.x;
+    const y = u * u * u * p0.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * p3.y;
+    // The derivative, for the tangent. Both ends of this curve have their
+    // control point directly above them, so the tangent there is vertical and
+    // the normal is horizontal — which is what makes the arm meet the shaft and
+    // the lantern squarely instead of at a slice.
+    const dx = 3 * u * u * (c1.x - p0.x) + 6 * u * t * (c2.x - c1.x) + 3 * t * t * (p3.x - c2.x);
+    const dy = 3 * u * u * (c1.y - p0.y) + 6 * u * t * (c2.y - c1.y) + 3 * t * t * (p3.y - c2.y);
+    const len = Math.hypot(dx, dy) || 1;
+    const half = (w0 + (w1 - w0) * t) / 2;
+    const nx = (-dy / len) * half;
+    const ny = (dx / len) * half;
+    near.push({ x: x + nx, y: y + ny });
+    far.push({ x: x - nx, y: y - ny });
+  }
+
+  g.beginPath();
+  g.moveTo(near[0]!.x, near[0]!.y);
+  for (const p of near.slice(1)) g.lineTo(p.x, p.y);
+  for (const p of far.reverse()) g.lineTo(p.x, p.y);
+  g.closePath();
+  g.fill();
+}
+
 function gasStandard(g: CanvasRenderingContext2D, w: number, hz: Horizon): void {
   const cx = w * STANDARD_X;
   const top = hz.bridgeTop;
@@ -159,28 +213,53 @@ function gasStandard(g: CanvasRenderingContext2D, w: number, hz: Horizon): void 
     g.fillRect(cx + s * SHAFT_W * 1.7 - (s > 0 ? 3 : 0), restY - 4, 3, 5);
   }
 
-  // Acanthus crown — leaves curling outward under the arm.
-  const crownY = top + 16;
-  for (const s of [-1, 1]) {
-    g.beginPath();
-    g.moveTo(cx, crownY - 12);
-    g.quadraticCurveTo(cx + s * 16, crownY - 8, cx + s * 11, crownY + 7);
-    g.quadraticCurveTo(cx + s * 6, crownY - 1, cx, crownY - 12);
-    g.fill();
+  // The capital the neck springs from.
+  //
+  // This was an acanthus: two leaves curling outward, each a pair of quadratics
+  // sixteen pixels across. Acanthus is a foliage carved in a dozen overlapping
+  // lobes, and none of that survives at a scale where the whole shaft is nine
+  // pixels wide — it came out as two sharp blades crossing the post, and it was
+  // the actual thing that looked wrong at the top of this lamp, not the arm.
+  //
+  // At this size a capital has exactly one legible property: it is WIDER than
+  // what it caps, and it steps. So it is drawn as what it reads as — an
+  // abacus, an echinus, a neck band — and nothing is attempted that the pixels
+  // cannot hold. See the halo-dither note in `dither.ts`: the same lesson.
+  for (const [dy, hgt, wide] of [[-3, 4, 0.75], [1, 4, 1.15], [5, 5, 0.85]] as const) {
+    g.fillRect(cx - SHAFT_W * wide, top + dy, SHAFT_W * wide * 2, hgt);
   }
 
-  // Bracket arm, curving inward to carry the lantern. Filled, not stroked —
-  // the arm is a cast-iron scroll with a thickness, and a stroke is the one
-  // thing this layer never uses (see the note on `gatePier`).
+  // The swan neck.
+  //
+  // This was two quadratics sharing endpoints and control points six pixels
+  // apart, which is not an outline of anything — it is the same curve drawn
+  // twice at slightly different heights. Thickness in a shape like that is
+  // whatever falls out of the geometry: measured PERPENDICULAR to the curve it
+  // came out fat where the arm ran steeply and pinched to nothing across the
+  // top, so the arm read as a lump over the post rather than as iron.
+  //
+  // It was also a single arc. A swan neck is an OGEE — it leaves the shaft
+  // going straight up and arrives over the lantern going straight down, and the
+  // two quarter-turns between are the whole character of the thing. One arc
+  // leaves the post sideways and meets the lantern sideways, and that is the
+  // reason it looked like a handle bolted on rather than a neck grown out.
+  //
+  // So: a real offset ribbon along a cubic, the same technique bridge.ts uses
+  // for the voussoir ring. The control points sit directly above the two ends,
+  // which is what forces both tangents vertical.
   const anchor = lanternAnchor(w, hz);
   const armEndY = anchor.y - 22;
-  g.beginPath();
-  g.moveTo(cx - 2, top + 6);
-  g.quadraticCurveTo(cx + (anchor.x - cx) * 0.55, top - 8, anchor.x + 2, armEndY);
-  g.lineTo(anchor.x - 2, armEndY);
-  g.quadraticCurveTo(cx + (anchor.x - cx) * 0.55, top - 2, cx + 3, top + 6);
-  g.closePath();
-  g.fill();
+  const apexY = top - 18;
+  scroll(
+    g,
+    { x: cx, y: top - 2 },
+    { x: cx, y: apexY - 4 },
+    { x: anchor.x, y: apexY },
+    { x: anchor.x, y: armEndY },
+    // Tapered, because cast iron is: the root carries the whole overhang and
+    // the tip carries a lantern. An even ribbon reads as bent pipe.
+    7, 4,
+  );
 
   /* ── The lantern ───────────────────────────────────────────────────────────
      A FRAME, not a box.
