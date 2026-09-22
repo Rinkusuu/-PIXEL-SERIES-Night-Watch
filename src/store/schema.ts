@@ -12,7 +12,27 @@ export type Quarry = {
   minutes: number;
   done: boolean;
   createdAt: number;
+  /**
+   * How many watches you think this will take. Absent means unestimated, which
+   * is most of them and has to stay the cheap default — a list that demands a
+   * number before it will hold a task is a list you stop using.
+   *
+   * WATCHES, not minutes, because that is the unit the work is actually done
+   * in: you do not plan "ninety minutes", you plan "two watches". The minutes
+   * it becomes depend on `huntMinutes`, which is a setting and may change, so
+   * the conversion is done at the moment of display and never stored.
+   */
+  estimate?: number;
 };
+
+/** Nobody plans past this honestly, and the row has room for one digit. */
+export const ESTIMATE_MAX = 9;
+
+/** 0 clears the estimate; anything else is clamped into range. */
+export function clampEstimate(v: number): number | undefined {
+  if (!Number.isFinite(v) || v <= 0) return undefined;
+  return Math.min(ESTIMATE_MAX, Math.round(v));
+}
 
 export type SessionRecord = {
   startedAt: number;

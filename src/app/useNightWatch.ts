@@ -16,7 +16,7 @@ import { notesForWatch, record } from '../session/notes';
 import { load, save } from '../store/persist';
 import { downloadTransfer, fromTransfer } from '../store/transfer';
 import { STORAGE_KEY } from '../store/schema';
-import { RETENTION_DAYS } from '../store/schema';
+import { RETENTION_DAYS, clampEstimate } from '../store/schema';
 import type { Schema } from '../store/schema';
 import { motionValue, nextMotion } from './motion';
 import { nightKey } from '../session/streak';
@@ -373,6 +373,28 @@ export function useNightWatch() {
       });
     },
 
+    /**
+     * The estimate, set from the same editor as the name.
+     *
+     * Separate from `renameQuarry` rather than folded into it: they are edited
+     * together but they fail differently — an empty name is a cancelled rename,
+     * while an empty estimate is a real instruction to clear one.
+     */
+    estimateQuarry: (id: string, watches: number) => setData((d) => {
+      const estimate = clampEstimate(watches);
+      const next: Schema = {
+        ...d,
+        quarry: d.quarry.map((q) => {
+          if (q.id !== id) return q;
+          // Dropped rather than set to undefined, so an exported ledger does
+          // not carry a field that means nothing.
+          const { estimate: _was, ...rest } = q;
+          return estimate === undefined ? rest : { ...rest, estimate };
+        }),
+      };
+      save(next);
+      return next;
+    }),
     renameQuarry: (id: string, name: string) => setData((d) => {
       const trimmed = name.trim();
       // An empty rename is a cancelled rename, not a request for a nameless

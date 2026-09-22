@@ -629,3 +629,25 @@
   margin-bottom: var(--px2);
 }
 .hours__axis .label { font-size: 0.7em; opacity: 0.6; }
+
+/* ── Quarry estimates ────────────────────────────────────────────────────── */
+.quarry__est {
+  /* One digit. The row already carries a name, a bar, a count, two tools and a
+     checkbox, and a full-width number box would take the name's room to hold
+     a single character. */
+  flex: none;
+  width: 3.5em;
+  margin-left: var(--px2);
+  border: 0;
+  color: var(--amb-ink);
+  padding: var(--px2);
+  font-family: var(--font-body);
+  font-size: var(--fs-small);
+}
+/* An overrun is a FACT, not an error: it is the most useful thing the estimate
+   can tell you, so it gets a mark of its own rather than a bar that quietly
+   stops at full and pretends the plan held. */
+.quarry__bar--over .meter__fill {
+  background: var(--amb-accent);
+  box-shadow: 0 0 var(--px2) color-mix(in oklab, var(--amb-accent) 50%, transparent);
+}

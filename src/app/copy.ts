@@ -106,6 +106,9 @@ export const COPY = {
   quarry: {
     rename: 'ubah nama',
     remove: 'hapus dari daftar (riwayat tetap)',
+    estimate: 'perkiraan berapa jaga (kosongkan untuk menghapus)',
+    against: (name: string, done: number, target: number) =>
+      `${name}: ${done} dari perkiraan ${target} jaga`,
   },
   ledger: {
     noQuarry: 'belum ada buruan yang tercatat waktunya.',

@@ -163,6 +163,8 @@ export function App() {
             onToggleDone={nw.actions.toggleQuarryDone}
             onRemove={nw.actions.removeQuarry}
             onRename={nw.actions.renameQuarry}
+            huntMinutes={nw.data.settings.huntMinutes}
+            onEstimate={nw.actions.estimateQuarry}
           />
           <TheLedger
             rows={nw.ledger}
