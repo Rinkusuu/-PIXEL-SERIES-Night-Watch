@@ -85,6 +85,8 @@ export const COPY = {
     exportHint: 'seluruh riwayat sebagai json',
     importLedger: 'muat ledger dari berkas',
     importHint: 'digabung, tidak menimpa',
+    postcard: 'simpan pemandangan malam ini',
+    postcardHint: 'png, persis yang sedang kamu lihat',
   },
   watch: {
     phase: 'fase',

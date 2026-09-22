@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { World } from './world/Canvas';
 import { makeGrainUri } from './world/grain';
 import { useNightWatch } from './app/useNightWatch';
@@ -10,10 +10,14 @@ import { Header } from './components/Header';
 import { useKeys } from './app/useKeys';
 import { Palette } from './components/Palette';
 import { buildCommands } from './app/commands';
+import { downloadPostcard, drawPostcard } from './world/postcard';
 
 export function App() {
   const nw = useNightWatch();
   const gridRef = useRef<HTMLDivElement>(null);
+  /** The world canvas, for the postcard. Owned here because the action needs it
+      and the component that draws it does not know the night's facts. */
+  const worldRef = useRef<HTMLCanvasElement | null>(null);
   const [deckTop, setDeckTop] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -88,6 +92,25 @@ export function App() {
 
   const held = nw.session.pausedAt !== null && nw.session.phase !== 'idle';
 
+  /**
+   * A plate of tonight's view.
+   *
+   * Lives here rather than in the hook: the hook owns the facts and the App
+   * owns the canvas, and handing a live DOM node into a store hook so it can
+   * hand it straight back out would be the wrong way round.
+   */
+  const postcard = useCallback(() => {
+    const cv = worldRef.current;
+    if (!cv) return;
+    downloadPostcard(drawPostcard(cv, {
+      night: nw.tonight.key,
+      weather: nw.weather,
+      minutes: nw.tonight.minutes,
+      sessions: nw.tonight.count,
+      streak: nw.streak,
+    }), nw.tonight.key);
+  }, [nw.tonight, nw.weather, nw.streak]);
+
   const commands = useMemo(() => buildCommands({
     phase: nw.session.phase,
     held,
@@ -103,8 +126,9 @@ export function App() {
       toggleZen: () => setZen((o) => !o),
       exportLedger: nw.actions.exportLedger,
       importLedger: () => fileRef.current?.click(),
+      postcard,
     },
-  }), [nw.session.phase, held, nw.session.quarryId, nw.data.settings, nw.data.quarry, nw.actions, ledgerWide, zen]);
+  }), [nw.session.phase, held, nw.session.quarryId, nw.data.settings, nw.data.quarry, nw.actions, ledgerWide, zen, postcard]);
 
   return (
     <>
@@ -116,6 +140,7 @@ export function App() {
         deckTop={deckTop}
         zen={zen}
         onSkip={(bounces) => { if (bounces >= 5) nw.actions.note('stone'); }}
+        onCanvas={(el) => { worldRef.current = el; }}
       />
       <main className="app">
         {/* The page had three h2 panels and nothing above them, so a screen

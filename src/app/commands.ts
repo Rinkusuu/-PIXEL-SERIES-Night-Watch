@@ -49,6 +49,7 @@ export type CommandInput = {
     toggleZen: () => void;
     exportLedger: () => void;
     importLedger: () => void;
+    postcard: () => void;
   };
 };
 
@@ -70,6 +71,13 @@ export function buildCommands(i: CommandInput): Command[] {
       : { id: 'hold', label: COPY.cmd.hold, hint: COPY.cmd.holdHint, run: i.actions.toggleHold });
     c.push({ id: 'skip', label: COPY.cmd.skip, hint: COPY.cmd.skipHint, run: i.actions.skip });
   }
+
+  c.push({
+    id: 'postcard',
+    label: COPY.cmd.postcard,
+    hint: COPY.cmd.postcardHint,
+    run: i.ui.postcard,
+  });
 
   c.push({
     id: 'zen',

@@ -15,9 +15,17 @@ type Props = {
   zen: boolean;
   /** Told how many times it bounced, or 0 for a throw that missed the water. */
   onSkip?: (bounces: number) => void;
+  /**
+   * Handed the canvas once it is mounted, so a postcard can be taken of it.
+   *
+   * The element rather than the CSS-resolution buffer: what is on screen has
+   * already been blown up to the device with nearest neighbour, which is the
+   * version the viewer is actually looking at and the one worth keeping.
+   */
+  onCanvas?: (canvas: HTMLCanvasElement | null) => void;
 };
 
-export function World({ values, progress, motion, weather, deckTop, zen, onSkip }: Props) {
+export function World({ values, progress, motion, weather, deckTop, zen, onSkip, onCanvas }: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
   // Read through a ref so the rAF loop is started exactly once.
   const latest = useRef({ values, progress, motion, weather, deckTop, zen, onSkip });
@@ -119,5 +127,11 @@ export function World({ values, progress, motion, weather, deckTop, zen, onSkip 
     };
   }, []);
 
-  return <canvas ref={ref} className="world" aria-hidden="true" />;
+  return (
+    <canvas
+      ref={(el) => { ref.current = el; onCanvas?.(el); }}
+      className="world"
+      aria-hidden="true"
+    />
+  );
 }
