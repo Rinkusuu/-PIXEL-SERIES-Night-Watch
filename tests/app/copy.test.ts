@@ -63,8 +63,24 @@ describe('every hand-written string', () => {
     for (const line of ambient) expect(line).toBe(line.toLowerCase());
   });
 
+  /**
+   * This asserted the exact list `['MULAI', 'HENTI', 'LEWATI', 'TAMBAH']`, which
+   * is not the rule — it is a copy of the answer. It failed the first time a
+   * control was added, and a test that fails for being right teaches you to
+   * edit tests instead of reading them. The rule the name states is checked
+   * here instead, and it holds for labels nobody has written yet.
+   */
   it('keeps control labels uppercase and unpoeticised', () => {
-    expect(Object.values(COPY.labels)).toEqual(['MULAI', 'HENTI', 'LEWATI', 'TAMBAH']);
+    const labels = Object.values(COPY.labels);
+    expect(labels.length).toBeGreaterThan(3);
+    for (const l of labels) {
+      expect(l).toBe(l.toUpperCase());
+      // One word. A control label is a verb, not a sentence.
+      expect(l).toMatch(/^[A-Z]+$/);
+      // Six characters is what the pixel face holds in a button at this size;
+      // past that the buttons stop being the same width as each other.
+      expect(l.length).toBeLessThanOrEqual(6);
+    }
   });
 });
 

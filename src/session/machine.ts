@@ -11,11 +11,39 @@ export type SessionState = {
   quarryId: string | null;
   /** progress held during respite so the sky does not rewind. Spec §4.1 */
   frozenProgress: number;
+  /**
+   * Time already banked from pauses that have ended, and the start of the one
+   * still running.
+   *
+   * Two fields rather than one because a pause has to be correct while it is
+   * happening, not only afterwards. `elapsedMs` subtracts both, so every reader
+   * — the clock, the sky, the record written at the end — stops together
+   * without any of them knowing that pausing exists.
+   */
+  pausedMs: number;
+  pausedAt: number | null;
 };
 
 export type SessionEvent =
   | { type: 'start'; at: number }
   | { type: 'stop'; at: number }
+  // `unpause`, not `resume`, because `resume()` above is the function that
+  // picks a watch up after a reload. Two different things called the same name
+  // in one module is a trap for whoever reads it next.
+  | { type: 'pause'; at: number }
+  | { type: 'unpause'; at: number }
+  /**
+   * Hold if running, lift if held — decided HERE, from the state, rather than
+   * by whoever pressed the button.
+   *
+   * It was decided by the caller first, and the caller was a `useCallback` that
+   * did not list `session` among its dependencies. So it read `pausedAt` from
+   * the render in which it was created, saw `null` forever, and dispatched
+   * `pause` every time: the button held the watch and then would not lift it.
+   * The only party that can answer this question without being stale is the
+   * reducer, because it is handed the state.
+   */
+  | { type: 'toggleHold'; at: number }
   | { type: 'skip'; at: number }
   | { type: 'tick'; at: number }
   | { type: 'setDurations'; huntMinutes: number; respiteMinutes: number; at: number }
@@ -38,11 +66,22 @@ export type RunningWatch = {
   phase: 'hunt' | 'respite';
   startedAt: number;
   quarryId: string | null;
+  /**
+   * The pause survives the tab closing too, and a watch that was held stays
+   * held — a pause whose clock restarts the moment you look away is not a
+   * pause. Both are optional so a store written before pausing existed still
+   * loads; `runningIn` supplies the defaults.
+   */
+  pausedMs?: number;
+  pausedAt?: number | null;
 };
 
 export function runningOf(s: SessionState): RunningWatch | null {
   if (s.phase === 'idle' || s.startedAt === null) return null;
-  return { phase: s.phase, startedAt: s.startedAt, quarryId: s.quarryId };
+  return {
+    phase: s.phase, startedAt: s.startedAt, quarryId: s.quarryId,
+    pausedMs: s.pausedMs, pausedAt: s.pausedAt,
+  };
 }
 
 /**
@@ -68,10 +107,17 @@ export function resume(
     startedAt: running.startedAt,
     quarryId: running.quarryId,
     frozenProgress: running.phase === 'respite' ? 1 : 0,
+    pausedMs: running.pausedMs ?? 0,
+    pausedAt: running.pausedAt ?? null,
   };
 
   // Still inside its own phase: hand it straight back, clock and all.
   if (remainingMs(state, now) > 0) return { state, completed: null };
+
+  // A held watch cannot run out, so it never reaches here: `remainingMs` is
+  // computed from a frozen elapsed and stays where it was left. Coming back to
+  // a watch you held on Friday and finding it recorded over the weekend would
+  // be the same bug as losing it, in the other direction.
 
   // The phase ran out while nobody was here. Run the machine's own tick over
   // it rather than reimplementing what a finished phase does — that is the
@@ -99,6 +145,8 @@ export function initialState(huntMinutes: number, respiteMinutes: number): Sessi
     respiteMs: respiteMinutes * MIN,
     quarryId: null,
     frozenProgress: 0,
+    pausedMs: 0,
+    pausedAt: null,
   };
 }
 
@@ -108,7 +156,16 @@ export function initialState(huntMinutes: number, respiteMinutes: number): Sessi
  */
 export function elapsedMs(state: SessionState, now: number): number {
   if (state.startedAt === null) return 0;
-  return Math.max(0, now - state.startedAt);
+  // While held, the clock is read at the moment it was held: `now` advances
+  // and nothing here does. This is the ONLY place pausing is subtracted, which
+  // is why the countdown, the sky and the record all stop together.
+  const upTo = state.pausedAt ?? now;
+  return Math.max(0, upTo - state.startedAt - state.pausedMs);
+}
+
+/** Whether the watch is being held. Idle is not held; it is simply not running. */
+export function isHeld(state: SessionState): boolean {
+  return state.phase !== 'idle' && state.pausedAt !== null;
 }
 
 /**
@@ -148,23 +205,56 @@ export function reduce(
     case 'start':
       if (state.phase === 'hunt') return { state, completed: null };
       return {
-        state: { ...state, phase: 'hunt', startedAt: ev.at, frozenProgress: 0 },
+        state: {
+          ...state, phase: 'hunt', startedAt: ev.at, frozenProgress: 0,
+          pausedMs: 0, pausedAt: null,
+        },
         completed: null,
       };
 
     case 'stop': {
       if (state.phase !== 'hunt') {
-        return { state: { ...state, phase: 'idle', startedAt: null }, completed: null };
+        return {
+          state: { ...state, phase: 'idle', startedAt: null, pausedMs: 0, pausedAt: null },
+          completed: null,
+        };
       }
       return {
-        state: { ...state, phase: 'idle', startedAt: null, frozenProgress: 0 },
+        state: {
+          ...state, phase: 'idle', startedAt: null, frozenProgress: 0,
+          pausedMs: 0, pausedAt: null,
+        },
         completed: record(state, ev.at),
+      };
+    }
+
+    case 'toggleHold':
+      return reduce(state, { type: state.pausedAt === null ? 'pause' : 'unpause', at: ev.at });
+
+    case 'pause':
+      // Nothing to hold when idle, and holding twice would throw away the first
+      // pause's origin and with it every minute since.
+      if (state.phase === 'idle' || state.pausedAt !== null) return { state, completed: null };
+      return { state: { ...state, pausedAt: ev.at }, completed: null };
+
+    case 'unpause': {
+      if (state.pausedAt === null) return { state, completed: null };
+      return {
+        state: {
+          ...state,
+          pausedMs: state.pausedMs + Math.max(0, ev.at - state.pausedAt),
+          pausedAt: null,
+        },
+        completed: null,
       };
     }
 
     case 'skip':
       return {
-        state: { ...state, phase: 'idle', startedAt: null, frozenProgress: 0 },
+        state: {
+          ...state, phase: 'idle', startedAt: null, frozenProgress: 0,
+          pausedMs: 0, pausedAt: null,
+        },
         completed: null,
       };
 
@@ -176,13 +266,19 @@ export function reduce(
           quarryId: state.quarryId,
         };
         return {
-          state: { ...state, phase: 'respite', startedAt: ev.at, frozenProgress: 1 },
+          state: {
+            ...state, phase: 'respite', startedAt: ev.at, frozenProgress: 1,
+            pausedMs: 0, pausedAt: null,
+          },
           completed,
         };
       }
       if (state.phase === 'respite' && elapsedMs(state, ev.at) >= state.respiteMs) {
         return {
-          state: { ...state, phase: 'idle', startedAt: null, frozenProgress: 0 },
+          state: {
+            ...state, phase: 'idle', startedAt: null, frozenProgress: 0,
+            pausedMs: 0, pausedAt: null,
+          },
           completed: null,
         };
       }

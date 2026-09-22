@@ -60,6 +60,8 @@ export const COPY = {
     start: 'mulai jaga', startHint: 'nyalakan lampu dan mulai hitung',
     stop: 'hentikan jaga', stopHint: 'catat yang sudah terkumpul',
     skip: 'lewati fase ini', skipHint: 'tanpa mencatat apa pun',
+    hold: 'tahan jaga', holdHint: 'jam berhenti, menit yang sudah ada tetap',
+    unhold: 'lanjutkan jaga', unholdHint: 'jam jalan lagi dari tempat ia ditahan',
     zenOn: 'masuk zen', zenOff: 'keluar dari zen',
     zenHint: 'sembunyikan semuanya; tinggal malamnya',
     takeQuarry: (n: string) => `ambil buruan: ${n.toLowerCase()}`,
@@ -98,6 +100,8 @@ export const COPY = {
     },
   },
   phaseName: { idle: 'diam', hunt: 'berjaga', respite: 'jeda' } as const,
+  /** Shown in place of the phase while the watch is held. */
+  phaseHeld: 'tertahan',
   weatherName: { clear: 'cerah', fog: 'berkabut', rain: 'hujan', fullmoon: 'purnama' } as const,
   quarry: {
     rename: 'ubah nama',
@@ -120,6 +124,8 @@ export const COPY = {
     start: 'MULAI',
     stop: 'HENTI',
     skip: 'LEWATI',
+    hold: 'TAHAN',
+    unhold: 'LANJUT',
     add: 'TAMBAH',
   },
 } as const;

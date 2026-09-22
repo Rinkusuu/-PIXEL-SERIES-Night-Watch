@@ -26,6 +26,8 @@ export type Command = {
 
 export type CommandInput = {
   phase: Phase;
+  /** Whether the watch is currently held. Changes this list, not just a label. */
+  held: boolean;
   settings: Settings;
   quarry: readonly Quarry[];
   selectedId: string | null;
@@ -39,6 +41,7 @@ export type CommandInput = {
     setDurations: (hunt: number, respite: number) => void;
     toggleAlert: (key: 'title' | 'chime' | 'notify') => void;
     cycleMotion: () => void;
+    toggleHold: () => void;
   };
   ui: {
     toggleSettings: () => void;
@@ -60,6 +63,11 @@ export function buildCommands(i: CommandInput): Command[] {
     : { id: 'stop', label: COPY.cmd.stop, hint: COPY.cmd.stopHint, run: i.actions.stop });
 
   if (i.phase !== 'idle') {
+    // Above `skip`, because holding is the thing you reach for when you have to
+    // step away, and skipping is the thing you reach for when you have given up.
+    c.push(i.held
+      ? { id: 'unhold', label: COPY.cmd.unhold, hint: COPY.cmd.unholdHint, run: i.actions.toggleHold }
+      : { id: 'hold', label: COPY.cmd.hold, hint: COPY.cmd.holdHint, run: i.actions.toggleHold });
     c.push({ id: 'skip', label: COPY.cmd.skip, hint: COPY.cmd.skipHint, run: i.actions.skip });
   }
 

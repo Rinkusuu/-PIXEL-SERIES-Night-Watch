@@ -12,7 +12,9 @@ describe('runningOf', () => {
 
   it('keeps only what cannot be recomputed', () => {
     const s = { ...base, phase: 'hunt' as const, startedAt: T0, quarryId: 'q1' };
-    expect(runningOf(s)).toEqual({ phase: 'hunt', startedAt: T0, quarryId: 'q1' });
+    expect(runningOf(s)).toEqual({
+      phase: 'hunt', startedAt: T0, quarryId: 'q1', pausedMs: 0, pausedAt: null,
+    });
   });
 });
 

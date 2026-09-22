@@ -41,6 +41,10 @@ export function App() {
   const keys = useMemo(() => ({
     ' ': () => (nw.session.phase === 'idle' ? nw.actions.start() : nw.actions.stop()),
     s: () => { if (nw.session.phase !== 'idle') nw.actions.skip(); },
+    // `h` for hold. Not Space, which already starts and stops: the whole point
+    // of holding is that it is NOT stopping, and a key that sometimes means one
+    // and sometimes the other is worse than no key at all.
+    h: () => { if (nw.session.phase !== 'idle') nw.actions.toggleHold(); },
     ',': () => setSettingsOpen((o) => !o),
     z: () => setZen((o) => !o),
     'mod+k': () => setPaletteOpen((o) => !o),
@@ -82,8 +86,11 @@ export function App() {
 
   const selected = nw.data.quarry.find((q) => q.id === nw.session.quarryId) ?? null;
 
+  const held = nw.session.pausedAt !== null && nw.session.phase !== 'idle';
+
   const commands = useMemo(() => buildCommands({
     phase: nw.session.phase,
+    held,
     settings: nw.data.settings,
     quarry: nw.data.quarry,
     selectedId: nw.session.quarryId,
@@ -97,7 +104,7 @@ export function App() {
       exportLedger: nw.actions.exportLedger,
       importLedger: () => fileRef.current?.click(),
     },
-  }), [nw.session.phase, nw.session.quarryId, nw.data.settings, nw.data.quarry, nw.actions, ledgerWide, zen]);
+  }), [nw.session.phase, held, nw.session.quarryId, nw.data.settings, nw.data.quarry, nw.actions, ledgerWide, zen]);
 
   return (
     <>
@@ -144,6 +151,8 @@ export function App() {
             onStart={nw.actions.start}
             onStop={nw.actions.stop}
             onSkip={nw.actions.skip}
+            held={held}
+            onToggleHold={nw.actions.toggleHold}
             onCycleMotion={nw.actions.cycleMotion}
           />
           <TheQuarry

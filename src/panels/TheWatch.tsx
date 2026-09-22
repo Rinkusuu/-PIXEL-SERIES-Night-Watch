@@ -21,6 +21,7 @@ export function TheWatch({
   phase, progress, remainingMs, quarryName, bloodmoon, settings, tonight, weather,
   settingsOpen, onToggleSettings, onDurations, onToggleAlert,
   onStart, onStop, onSkip, onCycleMotion, onExport, onImport,
+  held, onToggleHold,
 }: {
   phase: Phase;
   progress: number;
@@ -37,6 +38,8 @@ export function TheWatch({
   onStart: () => void;
   onStop: () => void;
   onSkip: () => void;
+  held: boolean;
+  onToggleHold: () => void;
   onCycleMotion: () => void;
   onExport: () => void;
   onImport: () => void;
@@ -76,6 +79,12 @@ export function TheWatch({
             {phase === 'idle'
               ? <Button onClick={onStart}>{COPY.labels.start}</Button>
               : <Button onClick={onStop}>{COPY.labels.stop}</Button>}
+            {/* Between stopping and skipping, because that is the order of
+                how much you give up: hold keeps everything, stop keeps the
+                minutes, skip keeps nothing. */}
+            <Button onClick={onToggleHold} disabled={phase === 'idle'}>
+              {held ? COPY.labels.unhold : COPY.labels.hold}
+            </Button>
             <Button onClick={onSkip} disabled={phase === 'idle'}>{COPY.labels.skip}</Button>
           </div>
         </div>
@@ -84,7 +93,11 @@ export function TheWatch({
             phase is the only one that gets an accent, because it is the only
             one that changes on its own while you are looking at it. */}
         <div className="watch__side">
-          <Stat label={COPY.watch.phase} value={COPY.phaseName[phase]} tone={phaseTone(phase)} />
+          <Stat
+            label={COPY.watch.phase}
+            value={held ? COPY.phaseHeld : COPY.phaseName[phase]}
+            tone={held ? undefined : phaseTone(phase)}
+          />
           <Stat label={COPY.watch.weather} value={COPY.weatherName[weather]} tone="dusk" />
           <Stat label={COPY.watch.night} value={tonight.key.slice(5)} />
           <Stat label={COPY.watch.since} value={COPY.watch.clockAt(tonight.startedAt)} />

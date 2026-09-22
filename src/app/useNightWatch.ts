@@ -5,7 +5,7 @@ import { resolve } from '../ambient/interpolate';
 import { NIGHT_KEYS } from '../ambient/keyframes';
 import type { AmbientValues, GradeName } from '../ambient/types';
 import {
-  initialState, progressOf, reduce, remainingMs as remainingOf, resume, runningOf,
+  initialState, isHeld, progressOf, reduce, remainingMs as remainingOf, resume, runningOf,
   type SessionEvent, type SessionState,
 } from '../session/machine';
 import {
@@ -158,8 +158,14 @@ export function useNightWatch() {
   /**
    * And from here on, every change of phase is written down as it happens.
    *
-   * Cheap: `running` is three fields, and this only fires when the phase or its
-   * start actually moves, not on every tick.
+   * Cheap: `running` is a handful of fields, and this only fires when the phase,
+   * its start or the hold actually moves — not on every tick.
+   *
+   * The hold has to be in here, and in the comparison below. It was not, so a
+   * watch held at 12:04 and then reloaded came back running: the store still
+   * held the version from before the hold, and every minute of the pause was
+   * counted as watched. A pause that a refresh silently cashes in is worse than
+   * no pause, because you would not have left the desk without it.
    */
   useEffect(() => {
     const now2 = runningOf(session);
@@ -168,13 +174,14 @@ export function useNightWatch() {
       const same = was === now2
         || (was !== null && now2 !== null
             && was.phase === now2.phase && was.startedAt === now2.startedAt
-            && was.quarryId === now2.quarryId);
+            && was.quarryId === now2.quarryId
+            && was.pausedMs === now2.pausedMs && was.pausedAt === now2.pausedAt);
       if (same) return d;
       const next: Schema = { ...d, running: now2 };
       save(next);
       return next;
     });
-  }, [session.phase, session.startedAt, session.quarryId]);
+  }, [session.phase, session.startedAt, session.quarryId, session.pausedMs, session.pausedAt]);
 
   /**
    * Another tab wrote to the store.
@@ -256,9 +263,9 @@ export function useNightWatch() {
   // actually matches how the app is used: press start, switch to your work.
   useEffect(() => {
     document.title = data.settings.alerts.title
-      ? titleFor(session.phase, formatClock(remainingMs), selectedName)
+      ? titleFor(session.phase, formatClock(remainingMs), selectedName, isHeld(session))
       : 'Night Watch';
-  }, [data.settings.alerts.title, session.phase, remainingMs, selectedName]);
+  }, [data.settings.alerts.title, session.phase, remainingMs, selectedName, session.pausedAt]);
 
   const gradesRef = useRef(grades);
   gradesRef.current = grades;
@@ -322,6 +329,13 @@ export function useNightWatch() {
     start: () => dispatch({ type: 'start', at: Date.now() }),
     stop: () => dispatch({ type: 'stop', at: Date.now() }),
     skip: () => dispatch({ type: 'skip', at: Date.now() }),
+    /**
+     * One action, not two. Holding and lifting are the same button and the same
+     * key, and asking the caller to work out which it wants would put the same
+     * `pausedAt !== null` test in the button, the shortcut and the palette —
+     * three copies of one question, which is how they end up disagreeing.
+     */
+    toggleHold: () => dispatch({ type: 'toggleHold', at: Date.now() }),
     selectQuarry: (quarryId: string | null) => dispatch({ type: 'selectQuarry', quarryId }),
     addQuarry: (name: string) => setData((d) => {
       const trimmed = name.trim();

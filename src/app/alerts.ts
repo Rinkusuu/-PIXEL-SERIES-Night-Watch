@@ -18,9 +18,12 @@ import type { Alerts } from '../store/schema';
 
 /** Title while a phase is running: the clock first, so it survives truncation. */
 export function titleFor(
-  phase: Phase, clock: string, quarry: string | null,
+  phase: Phase, clock: string, quarry: string | null, held = false,
 ): string {
   if (phase === 'idle') return 'Night Watch';
+  // A held watch has a clock that does not move, and a countdown sitting still
+  // in a tab title reads as a broken app rather than as a deliberate pause.
+  if (held) return `${clock} · tertahan`;
   // The clock goes FIRST. A pinned tab shows about six characters, and
   // "Night Watch — 12:0…" is a countdown you cannot read.
   const tail = phase === 'respite' ? 'jeda' : quarry ?? 'jaga';
