@@ -14,13 +14,15 @@ import { HUNT_RANGE, RESPITE_RANGE, type Alerts, type Settings as S } from '../s
  * controls. It belongs inside the card whose subject it is.
  */
 export function Settings({
-  settings, open, onDurations, onToggleAlert, onCycleMotion,
+  settings, open, onDurations, onToggleAlert, onCycleMotion, onExport, onImport,
 }: {
   settings: S;
   open: boolean;
   onDurations: (hunt: number, respite: number) => void;
   onToggleAlert: (key: keyof Alerts) => void;
   onCycleMotion: () => void;
+  onExport: () => void;
+  onImport: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -77,6 +79,14 @@ export function Settings({
               {COPY.settings.alertNames[k]}
             </Button>
           ))}
+        </div>
+      </div>
+
+      <div className="settings__row">
+        <span className="label">{COPY.settings.data}</span>
+        <div className="settings__opts">
+          <Button onClick={onExport}>{COPY.settings.save}</Button>
+          <Button onClick={onImport}>{COPY.settings.load}</Button>
         </div>
       </div>
 

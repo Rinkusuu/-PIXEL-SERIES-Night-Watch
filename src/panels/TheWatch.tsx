@@ -20,7 +20,7 @@ function phaseTone(phase: Phase): 'glow' | 'dusk' | undefined {
 export function TheWatch({
   phase, progress, remainingMs, quarryName, bloodmoon, settings, tonight, weather,
   settingsOpen, onToggleSettings, onDurations, onToggleAlert,
-  onStart, onStop, onSkip, onCycleMotion,
+  onStart, onStop, onSkip, onCycleMotion, onExport, onImport,
 }: {
   phase: Phase;
   progress: number;
@@ -38,6 +38,8 @@ export function TheWatch({
   onStop: () => void;
   onSkip: () => void;
   onCycleMotion: () => void;
+  onExport: () => void;
+  onImport: () => void;
 }) {
   const line = ambientLine({ phase, progress, hasQuarry: quarryName !== null, bloodmoon });
 
@@ -96,6 +98,8 @@ export function TheWatch({
         onDurations={onDurations}
         onToggleAlert={onToggleAlert}
         onCycleMotion={onCycleMotion}
+        onExport={onExport}
+        onImport={onImport}
       />
     </Panel>
   );

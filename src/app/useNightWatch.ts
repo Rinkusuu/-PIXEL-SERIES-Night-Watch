@@ -14,6 +14,8 @@ import {
 import { streakLength } from '../session/streak';
 import { notesForWatch, record } from '../session/notes';
 import { load, save } from '../store/persist';
+import { downloadTransfer, fromTransfer } from '../store/transfer';
+import { STORAGE_KEY } from '../store/schema';
 import { RETENTION_DAYS } from '../store/schema';
 import type { Schema } from '../store/schema';
 import { motionValue, nextMotion } from './motion';
@@ -173,6 +175,36 @@ export function useNightWatch() {
       return next;
     });
   }, [session.phase, session.startedAt, session.quarryId]);
+
+  /**
+   * Another tab wrote to the store.
+   *
+   * `save()` writes the whole schema at once, so two tabs open meant the one
+   * that wrote last silently erased whatever the other had recorded — a
+   * finished watch could simply vanish because you had the app open twice.
+   *
+   * The `storage` event fires only in OTHER tabs, never the one that wrote, so
+   * this cannot loop. Sessions are merged by `startedAt` rather than replaced:
+   * both tabs may have recorded real work, and taking the newer wholesale is
+   * the same data loss from the other direction.
+   */
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== STORAGE_KEY || e.newValue === null) return;
+      setData((mine) => {
+        const merged = fromTransfer(
+          JSON.stringify({ kind: 'nightwatch-ledger', version: 1, exportedAt: Date.now(),
+                           data: JSON.parse(e.newValue!) }),
+          mine,
+        );
+        // A write we cannot read is a write we leave alone. The other tab still
+        // holds it, and overwriting from here would lose it for both.
+        return merged.ok ? merged.data : mine;
+      });
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   // The rAF-free heartbeat: one tick a second is enough for a clock, and the
   // machine reads wall-clock time anyway.
@@ -408,6 +440,25 @@ export function useNightWatch() {
       save(next);
       return next;
     }),
+
+    /** Hand the whole ledger over as a file. */
+    exportLedger: () => setData((d) => { downloadTransfer(d); return d; }),
+
+    /**
+     * Read one back. Merges; never replaces. Returns how many nights were new,
+     * or null when the file was not ours to read.
+     */
+    importLedger: (raw: string): number | null => {
+      let added: number | null = null;
+      setData((mine) => {
+        const r = fromTransfer(raw, mine);
+        if (!r.ok) return mine;
+        added = r.added;
+        save(r.data);
+        return r.data;
+      });
+      return added;
+    },
 
     cycleMotion: () => setData((d) => {
       const next: Schema = {

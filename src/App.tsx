@@ -26,6 +26,14 @@ export function App() {
    * and leaving zen would hand you back a different app than the one you left.
    */
   const [zen, setZen] = useState(false);
+  /**
+   * A file input, kept off screen and clicked from the palette.
+   *
+   * A browser will not open a file picker from anything but a real click on a
+   * real `<input type=file>`, so the command cannot do it directly — it has to
+   * reach one that already exists in the tree.
+   */
+  const fileRef = useRef<HTMLInputElement>(null);
 
   // Space is the one shortcut that has to exist: starting and stopping is what
   // the app is for. `useKeys` ignores keys typed into a field, which is what
@@ -86,6 +94,8 @@ export function App() {
       toggleSettings: () => setSettingsOpen((o) => !o),
       toggleLedger: () => setLedgerWide((o) => !o),
       toggleZen: () => setZen((o) => !o),
+      exportLedger: nw.actions.exportLedger,
+      importLedger: () => fileRef.current?.click(),
     },
   }), [nw.session.phase, nw.session.quarryId, nw.data.settings, nw.data.quarry, nw.actions, ledgerWide, zen]);
 
@@ -129,6 +139,8 @@ export function App() {
             onToggleSettings={() => setSettingsOpen((o) => !o)}
             onDurations={nw.actions.setDurations}
             onToggleAlert={nw.actions.toggleAlert}
+            onExport={nw.actions.exportLedger}
+            onImport={() => fileRef.current?.click()}
             onStart={nw.actions.start}
             onStop={nw.actions.stop}
             onSkip={nw.actions.skip}
@@ -157,6 +169,20 @@ export function App() {
           />
         </div>
       </main>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="application/json,.json"
+        className="sr-only"
+        aria-label={COPY.cmd.importLedger}
+        onChange={async (e) => {
+          const f = e.target.files?.[0];
+          // Cleared either way, so choosing the SAME file twice still fires a
+          // change event the second time.
+          e.target.value = '';
+          if (f) nw.actions.importLedger(await f.text());
+        }}
+      />
       <Palette open={paletteOpen} commands={commands} onClose={() => setPaletteOpen(false)} />
       <div className="grain" />
       <div className="scanlines" />

@@ -44,6 +44,8 @@ export type CommandInput = {
     toggleSettings: () => void;
     toggleLedger: () => void;
     toggleZen: () => void;
+    exportLedger: () => void;
+    importLedger: () => void;
   };
 };
 
@@ -110,6 +112,18 @@ export function buildCommands(i: CommandInput): Command[] {
     label: COPY.cmd.motion(i.settings.motion),
     hint: COPY.cmd.motionHint,
     run: i.actions.cycleMotion,
+  });
+  c.push({
+    id: 'export',
+    label: COPY.cmd.exportLedger,
+    hint: COPY.cmd.exportHint,
+    run: i.ui.exportLedger,
+  });
+  c.push({
+    id: 'import',
+    label: COPY.cmd.importLedger,
+    hint: COPY.cmd.importHint,
+    run: i.ui.importLedger,
   });
   c.push({
     id: 'settings',

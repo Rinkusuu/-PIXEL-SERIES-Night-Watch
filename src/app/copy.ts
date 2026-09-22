@@ -43,6 +43,9 @@ export const COPY = {
     respite: 'panjang jeda (menit)',
     alerts: 'penanda',
     motion: 'gerak',
+    data: 'ledger',
+    save: 'SIMPAN',
+    load: 'MUAT',
     alertNames: { title: 'JUDUL', chime: 'LONCENG', notify: 'NOTIF' },
   },
   /**
@@ -76,6 +79,10 @@ export const COPY = {
     motion: (m: string) => `gerak: ${m === 'auto' ? 'ikuti sistem' : m === 'on' ? 'matikan' : 'nyalakan'}`,
     motionHint: 'dunia tetap digambar penuh; hanya gerakannya',
     settings: 'buka pengaturan', settingsHint: 'durasi, penanda, gerak',
+    exportLedger: 'simpan ledger ke berkas',
+    exportHint: 'seluruh riwayat sebagai json',
+    importLedger: 'muat ledger dari berkas',
+    importHint: 'digabung, tidak menimpa',
   },
   watch: {
     phase: 'fase',
