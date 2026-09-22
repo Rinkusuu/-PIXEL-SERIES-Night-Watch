@@ -4,25 +4,43 @@ import type { Horizon } from './horizon';
 import { SQUASH, type Water } from './water';
 import { hexToRgb, mixRgb, rgbToHex } from '../ambient/interpolate';
 import { hashString, rand } from './rng';
+import { type Season, seasonOf } from './season';
 
-export type Weather = 'clear' | 'fog' | 'rain' | 'fullmoon';
+export type Weather = 'clear' | 'fog' | 'rain' | 'snow' | 'fullmoon';
 
-const TABLE: readonly (readonly [Weather, number])[] = [
-  ['clear', 0.40],
-  ['fog', 0.30],
-  ['rain', 0.20],
-  ['fullmoon', 0.10],
-];
+/**
+ * The odds, by season.
+ *
+ * There was one table for all time, so January and July were the same coin
+ * toss. These are the same five outcomes reweighted — not a new mechanism —
+ * because the weather still has to be a pure function of the night key, still
+ * has to survive a resize, and still has to be the reason to open the app
+ * again tomorrow.
+ *
+ * The shape of them is London's: the great fogs belong to autumn and winter,
+ * summer is short and clear, and snow happens in winter or not at all. Every
+ * column sums to one; `tests/world/season.test.ts` checks that rather than
+ * trusting the arithmetic here.
+ */
+const TABLES: Record<Season, readonly (readonly [Weather, number])[]> = {
+  winter: [['clear', 0.22], ['fog', 0.34], ['rain', 0.18], ['snow', 0.16], ['fullmoon', 0.10]],
+  spring: [['clear', 0.40], ['fog', 0.22], ['rain', 0.28], ['snow', 0.00], ['fullmoon', 0.10]],
+  summer: [['clear', 0.58], ['fog', 0.10], ['rain', 0.22], ['snow', 0.00], ['fullmoon', 0.10]],
+  autumn: [['clear', 0.28], ['fog', 0.40], ['rain', 0.22], ['snow', 0.00], ['fullmoon', 0.10]],
+};
 
 /**
  * Seeded from `nightKey()`, so the same night is always the same weather. The
  * scene must not reshuffle on a resize, and there must be a reason to open the
  * app again tomorrow.
+ *
+ * The season comes from the same key, so the table and the roll can never
+ * disagree about which night this is.
  */
 export function weatherFor(key: string): Weather {
   const t = (hashString(key) % 10_000) / 10_000;
   let acc = 0;
-  for (const [name, weight] of TABLE) {
+  for (const [name, weight] of TABLES[seasonOf(key)]) {
     acc += weight;
     if (t < acc) return name;
   }
@@ -39,21 +57,29 @@ export type WeatherFx = {
   moonScale: number;
   /** 0..1 rain density */
   rain: number;
+  /** 0..1 snow density. Never both; they are drawn by different passes. */
+  snow: number;
   birds: boolean;
 };
 
 export function effectsFor(w: Weather): WeatherFx {
   switch (w) {
     case 'fog':
-      return { fogScale: 2.0, haloScale: 1.35, lumLift: 0, moonScale: 1, rain: 0, birds: false };
+      return { fogScale: 2.0, haloScale: 1.35, lumLift: 0, moonScale: 1, rain: 0, snow: 0, birds: false };
     case 'rain':
       // Rain washes the fog out. A wet London night is the CLEAREST one you get,
       // and the lamps harden into points instead of blooming.
-      return { fogScale: 0.55, haloScale: 0.80, lumLift: 0, moonScale: 1, rain: 1, birds: false };
+      return { fogScale: 0.55, haloScale: 0.80, lumLift: 0, moonScale: 1, rain: 1, snow: 0, birds: false };
+    case 'snow':
+      // Snow LIFTS the light instead of hardening it. Every surface in the
+      // picture is suddenly reflective, so the halos swell and the whole frame
+      // comes up — the opposite of rain, which is why it is worth having as its
+      // own night rather than as rain drawn more slowly.
+      return { fogScale: 0.70, haloScale: 1.45, lumLift: 0.08, moonScale: 1, rain: 0, snow: 1, birds: false };
     case 'fullmoon':
-      return { fogScale: 0.85, haloScale: 1.10, lumLift: 0.12, moonScale: 2, rain: 0, birds: true };
+      return { fogScale: 0.85, haloScale: 1.10, lumLift: 0.12, moonScale: 2, rain: 0, snow: 0, birds: true };
     default:
-      return { fogScale: 1, haloScale: 1, lumLift: 0, moonScale: 1, rain: 0, birds: true };
+      return { fogScale: 1, haloScale: 1, lumLift: 0, moonScale: 1, rain: 0, snow: 0, birds: true };
   }
 }
 
@@ -342,5 +368,45 @@ export function drawWeather(
         0.45,
       );
     }
+  }
+
+  /* 5 — snow. Winter only, and drawn by its own pass rather than by the rain
+     pass slowed down.
+
+     Rain is a STROKE: a drop falls far enough in one frame to leave a streak,
+     and the streak is the whole reading of it. Snow is a FILLED SQUARE that
+     drifts — it falls slowly enough that a flake is a thing rather than a
+     smear, it wanders sideways instead of raking, and it never rings the water
+     because it lands on it and stops. Drawing it as pale slow rain gives you
+     neither: a field of short grey dashes that reads as a dirty screen.
+
+     Squares, not circles. Matter is quantised; a subpixel disc at this size
+     antialiases into a grey smudge and is the one shape the rule exists to
+     forbid. */
+  if (fx.snow > 0 && motion !== 0) {
+    // Four times the rain's count, because a flake is a one-to-three pixel
+    // square and a raindrop is a thirteen-pixel streak. Matched at the rain's
+    // 220 the field was a scattering of specks you had to look for — measured
+    // on screen, not guessed.
+    const flakes = Math.round(760 * fx.snow * [1, 0.6, 0.35][Math.min(notch, 2)]!);
+    g.save();
+    g.fillStyle = v.lift;
+    for (let i = 0; i < flakes; i++) {
+      // Three sizes, and the small ones fall slowest — which is the only depth
+      // cue a flat field of flakes can have, and it does the work of a parallax
+      // layer for nothing.
+      const near = rand(i + 11);
+      const size = near > 0.86 ? 3 : near > 0.48 ? 2 : 1;
+      const speed = 34 + near * 66;
+      const y = (rand(i + 7) * hz.h + t * speed) % hz.h;
+      // The wander is keyed off the flake's own index and its HEIGHT, so it
+      // travels with the flake rather than being a horizontal ripple running
+      // across the whole field at once.
+      const sway = Math.sin(y * 0.03 + i * 1.7) * (6 + near * 8);
+      const x = ((rand(i + 3) * w + t * 12 + sway) % (w + 40)) - 20;
+      g.globalAlpha = 0.26 + near * 0.50;
+      g.fillRect(Math.round(x), Math.round(y), size, size);
+    }
+    g.restore();
   }
 }

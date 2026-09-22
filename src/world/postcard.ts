@@ -28,7 +28,7 @@ const MONTHS = [
 
 /** The world speaks English. The plate is part of the world, not of the chrome. */
 const WEATHER_WORD: Record<Weather, string> = {
-  clear: 'CLEAR', fog: 'FOG', rain: 'RAIN', fullmoon: 'FULL MOON',
+  clear: 'CLEAR', fog: 'FOG', rain: 'RAIN', snow: 'SNOW', fullmoon: 'FULL MOON',
 };
 
 /**

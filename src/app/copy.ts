@@ -104,7 +104,7 @@ export const COPY = {
   phaseName: { idle: 'diam', hunt: 'berjaga', respite: 'jeda' } as const,
   /** Shown in place of the phase while the watch is held. */
   phaseHeld: 'tertahan',
-  weatherName: { clear: 'cerah', fog: 'berkabut', rain: 'hujan', fullmoon: 'purnama' } as const,
+  weatherName: { clear: 'cerah', fog: 'berkabut', rain: 'hujan', snow: 'bersalju', fullmoon: 'purnama' } as const,
   quarry: {
     rename: 'ubah nama',
     remove: 'hapus dari daftar (riwayat tetap)',
