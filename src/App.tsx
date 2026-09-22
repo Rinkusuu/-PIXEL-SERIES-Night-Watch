@@ -11,6 +11,7 @@ import { useKeys } from './app/useKeys';
 import { Palette } from './components/Palette';
 import { buildCommands } from './app/commands';
 import { downloadPostcard, drawPostcard } from './world/postcard';
+import { dwellerAt } from './session/dwellers';
 
 export function App() {
   const nw = useNightWatch();
@@ -30,6 +31,15 @@ export function App() {
    * and leaving zen would hand you back a different app than the one you left.
    */
   const [zen, setZen] = useState(false);
+  /**
+   * What the last window you looked at had in it.
+   *
+   * It takes the place of the ambient line under the clock rather than
+   * arriving as a toast: the line already changes on its own while you watch,
+   * so the one channel the app has for saying something quiet is the one this
+   * belongs in. DNA §8.4 — nothing flies in.
+   */
+  const [overheard, setOverheard] = useState<string | null>(null);
   /**
    * A file input, kept off screen and clicked from the palette.
    *
@@ -90,6 +100,25 @@ export function App() {
 
   const selected = nw.data.quarry.find((q) => q.id === nw.session.quarryId) ?? null;
 
+  /**
+   * The line goes back to the watch's own after a while.
+   *
+   * Twelve seconds: long enough to read twice, short enough that the panel is
+   * not left saying something about a window you have stopped looking at. Keyed
+   * on the line itself, so pressing a second window restarts the clock rather
+   * than inheriting the first one's remainder.
+   */
+  useEffect(() => {
+    if (overheard === null) return;
+    const t = window.setTimeout(() => setOverheard(null), 12_000);
+    return () => window.clearTimeout(t);
+  }, [overheard]);
+
+  // And at once when the watch itself has something to say. A phase change is
+  // the app speaking; a window is the reader poking at the scenery, and the
+  // scenery does not get to talk over it.
+  useEffect(() => { setOverheard(null); }, [nw.session.phase]);
+
   const held = nw.session.pausedAt !== null && nw.session.phase !== 'idle';
 
   /**
@@ -140,6 +169,7 @@ export function App() {
         deckTop={deckTop}
         zen={zen}
         onSkip={(bounces) => { if (bounces >= 5) nw.actions.note('stone'); }}
+        onWindow={({ x, y }) => setOverheard(dwellerAt(x, y))}
         onCanvas={(el) => { worldRef.current = el; }}
       />
       <main className="app">
@@ -164,6 +194,7 @@ export function App() {
             remainingMs={nw.remainingMs}
             quarryName={selected?.name ?? null}
             bloodmoon={nw.grades.includes('bloodmoon')}
+            overheard={overheard}
             tonight={nw.tonight}
             weather={nw.weather}
             settings={nw.data.settings}

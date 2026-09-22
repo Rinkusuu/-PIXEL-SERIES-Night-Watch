@@ -6,6 +6,7 @@ import { drawWalker } from './figure';
 import { drawFog } from './fog';
 import { drawShafts } from './shafts';
 import { drawLamps, lampSpots, moonPos } from './bloom';
+import type { LampSpot } from './water';
 import { SQUASH, createWater, stoneSkip } from './water';
 import { drawForeground } from './foreground';
 import { VIGNETTE_INK } from './ladder';
@@ -63,6 +64,17 @@ export function createWorldRenderer() {
   let cachedDeck = -999;
   let cachedWeather: Weather | null = null;
   let cachedMoonY = -999;
+
+  /**
+   * The lit lights from the last frame, kept so a click can be tested against
+   * them.
+   *
+   * Recomputing `lampSpots` for a hit test would be the wrong answer twice: it
+   * walks every opening of every building, and it takes `progress`, so a test
+   * run outside the frame could disagree with what is actually burning on
+   * screen — you would click a lit window and be told there is nobody there.
+   */
+  let litWindows: LampSpot[] = [];
 
   const water = createWater();
   const clock = createFrameClock();
@@ -143,6 +155,7 @@ export function createWorldRenderer() {
 
     const moon = moonPos(w, hz, progress);
     const lamps = lampSpots(w, hz, blocks, progress, fx, moon);
+    litWindows = lamps.filter((l) => l.lit && l.kind === 'window');
 
     target.clearRect(0, 0, w, h);
     if (plate) target.drawImage(plate, 0, 0);
@@ -189,5 +202,25 @@ export function createWorldRenderer() {
     return hits.length;
   }
 
-  return { frame, invalidate, skip, plateBuilds: () => builds };
+  /**
+   * The lit window nearest a click, or null.
+   *
+   * The tolerance is generous — a window is four pixels across and a finger is
+   * not. It is measured in SCREEN distance rather than by a rectangle test so
+   * that the nearest one wins when two are close, instead of whichever happens
+   * to be first in the list.
+   */
+  function windowAt(x: number, y: number): LampSpot | null {
+    let best: LampSpot | null = null;
+    let bestD = 18 * 18;
+    for (const s of litWindows) {
+      const dx = s.x - x;
+      const dy = s.y - y;
+      const d = dx * dx + dy * dy;
+      if (d < bestD) { bestD = d; best = s; }
+    }
+    return best;
+  }
+
+  return { frame, invalidate, skip, windowAt, plateBuilds: () => builds };
 }

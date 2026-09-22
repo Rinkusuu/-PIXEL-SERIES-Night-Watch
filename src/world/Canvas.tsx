@@ -15,6 +15,8 @@ type Props = {
   zen: boolean;
   /** Told how many times it bounced, or 0 for a throw that missed the water. */
   onSkip?: (bounces: number) => void;
+  /** A lit window was pressed. Given its position, which is its identity. */
+  onWindow?: (at: { x: number; y: number }) => void;
   /**
    * Handed the canvas once it is mounted, so a postcard can be taken of it.
    *
@@ -25,11 +27,11 @@ type Props = {
   onCanvas?: (canvas: HTMLCanvasElement | null) => void;
 };
 
-export function World({ values, progress, motion, weather, deckTop, zen, onSkip, onCanvas }: Props) {
+export function World({ values, progress, motion, weather, deckTop, zen, onSkip, onWindow, onCanvas }: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
   // Read through a ref so the rAF loop is started exactly once.
-  const latest = useRef({ values, progress, motion, weather, deckTop, zen, onSkip });
-  latest.current = { values, progress, motion, weather, deckTop, zen, onSkip };
+  const latest = useRef({ values, progress, motion, weather, deckTop, zen, onSkip, onWindow });
+  latest.current = { values, progress, motion, weather, deckTop, zen, onSkip, onWindow };
 
   useEffect(() => {
     const cv = ref.current;
@@ -110,6 +112,11 @@ export function World({ values, progress, motion, weather, deckTop, zen, onSkip,
       const t = e.target as Element | null;
       if (t?.closest?.('.app, .cmd, .topbar')) return;
       const s = latest.current;
+      // A window first: it is the smaller target and it sits above the water,
+      // so nothing is taken away from the throw. A press that finds neither is
+      // still a throw that missed, which is a real outcome and not a bug.
+      const win = renderer.windowAt(e.clientX, e.clientY);
+      if (win) { s.onWindow?.({ x: win.x, y: win.y }); return; }
       const deck = s.zen ? zenDeckTop(h) : (s.deckTop || defaultDeckTop(h));
       s.onSkip?.(renderer.skip(e.clientX, e.clientY, h, deck));
     };

@@ -18,7 +18,7 @@ function phaseTone(phase: Phase): 'glow' | 'dusk' | undefined {
 }
 
 export function TheWatch({
-  phase, progress, remainingMs, quarryName, bloodmoon, settings, tonight, weather,
+  phase, progress, remainingMs, quarryName, bloodmoon, settings, tonight, weather, overheard,
   settingsOpen, onToggleSettings, onDurations, onToggleAlert,
   onStart, onStop, onSkip, onCycleMotion, onExport, onImport,
   held, onToggleHold,
@@ -28,6 +28,8 @@ export function TheWatch({
   remainingMs: number;
   quarryName: string | null;
   bloodmoon: boolean;
+  /** What a window had in it, if one was pressed. Takes the ambient line's place. */
+  overheard: string | null;
   settings: Settings;
   tonight: { key: string; count: number; minutes: number; startedAt: number | null };
   weather: Weather;
@@ -44,7 +46,8 @@ export function TheWatch({
   onExport: () => void;
   onImport: () => void;
 }) {
-  const line = ambientLine({ phase, progress, hasQuarry: quarryName !== null, bloodmoon });
+  const line = overheard
+    ?? ambientLine({ phase, progress, hasQuarry: quarryName !== null, bloodmoon });
 
   return (
     <Panel
