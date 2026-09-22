@@ -18,6 +18,44 @@ import type { Horizon } from './horizon';
 export const GATE_X = { left: 0.038, right: 0.962 } as const;
 export const STANDARD_X = 0.105;
 
+/**
+ * The standards along the near rail.
+ *
+ * `bloom.ts` was lighting five lamps here that nothing drew. Five flames hung
+ * in the air over the balustrade with no post under any of them — the same
+ * fault as the lantern painting over its own flame, in the other direction:
+ * there, ironwork with no light; here, light with no ironwork.
+ *
+ * So the positions live HERE, in the module that draws the posts, and bloom
+ * reads them. Two copies of these numbers is a flame beside its own lamp, and
+ * the river reflects whatever this list says, so a drift would put the
+ * reflection under a lamp that is not there.
+ *
+ * Spacing clears both gates. At `0.18 + k * 0.19` the last one landed at 0.94,
+ * two per cent from the right gate pier, and the two read as one object.
+ */
+export function railStandards(
+  w: number, hz: Horizon,
+): { x: number; y: number; arc: boolean }[] {
+  return Array.from({ length: 5 }, (_, k) => {
+    // The two at the FAR end are electric: the new lamps went up from one end
+    // of the Embankment, so a mixed row is a row caught mid-replacement.
+    const arc = k >= 3;
+    return {
+      x: Math.round(w * (0.20 + k * 0.165)),
+      // The head, which is where the light goes — not the base. An arc lamp
+      // stood taller than the gas it replaced, and it is the only difference
+      // the two can show at this size beyond the colour.
+      y: hz.railTop - (arc ? RAIL_ARC_H : RAIL_GAS_H),
+      arc,
+    };
+  });
+}
+
+/** Head heights above the parapet coping. Clear of the spear finials at 27. */
+const RAIL_GAS_H = 36;
+const RAIL_ARC_H = 46;
+
 /** How far the bracket arm reaches inward from the shaft, in shaft widths. */
 const BRACKET_REACH = 3.4;
 /**
@@ -444,6 +482,51 @@ function gasStandard(g: CanvasRenderingContext2D, w: number, hz: Horizon): void 
   g.fillRect(lx - 1, gBot + 11, 2, 3);
 }
 
+/**
+ * The posts those five lights sit on.
+ *
+ * Small — a tenth of the near lantern — so everything here is the fewest fills
+ * that still read. The heads are OPEN at the centre, for the reason the near
+ * lantern is: this layer is drawn last, over the bloom, and a solid head would
+ * paint out the flame it is supposed to be holding.
+ */
+function railLamps(g: CanvasRenderingContext2D, w: number, hz: Horizon): void {
+  for (const s of railStandards(w, hz)) {
+    const base = hz.railTop + 6;
+    // Tapered shaft. Three pixels at the head, five at the foot.
+    g.beginPath();
+    g.moveTo(s.x - 1.5, s.y);
+    g.lineTo(s.x + 1.5, s.y);
+    g.lineTo(s.x + 2.5, base);
+    g.lineTo(s.x - 2.5, base);
+    g.closePath();
+    g.fill();
+    // A collar, and a foot spreading onto the coping.
+    g.fillRect(s.x - 3, s.y + 12, 6, 2);
+    g.fillRect(s.x - 4, base - 3, 8, 3);
+
+    if (s.arc) {
+      // An arc lamp hangs from a cross-arm inside a wire guard. Two droppers
+      // either side and nothing across the middle: the guard is wire, the eye
+      // fills it in, and anything actually drawn there would be in front of
+      // the light.
+      g.fillRect(s.x - 6, s.y - 2, 12, 2);
+      for (const d of [-6, 4]) g.fillRect(s.x + d, s.y, 2, 7);
+      g.fillRect(s.x - 6, s.y + 7, 12, 2);
+      // The finial over the arm.
+      g.fillRect(s.x - 1, s.y - 6, 2, 4);
+    } else {
+      // A small gas lantern: a cap, two uprights, a pan. Four fills, and the
+      // flame shows between them.
+      g.fillRect(s.x - 5, s.y - 3, 10, 2);
+      g.fillRect(s.x - 4, s.y - 1, 1, 8);
+      g.fillRect(s.x + 3, s.y - 1, 1, 8);
+      g.fillRect(s.x - 5, s.y + 7, 10, 2);
+      g.fillRect(s.x - 1, s.y - 6, 2, 3);
+    }
+  }
+}
+
 function railFinials(g: CanvasRenderingContext2D, w: number, hz: Horizon): void {
   // The parapet runs smooth from edge to edge; this puts a vertical rhythm back
   // into the one line in the picture that has none. It sits exactly where the
@@ -497,6 +580,10 @@ export function drawForeground(
 
   g.globalAlpha = 0.92;
   railFinials(g, w, hz);
+  // After the finials, at the same slight remove: these stand on the same
+  // parapet and belong to the same depth. Full ink would make five small posts
+  // read as near as the gate piers, which are four times their size.
+  railLamps(g, w, hz);
 
   g.restore();
 }

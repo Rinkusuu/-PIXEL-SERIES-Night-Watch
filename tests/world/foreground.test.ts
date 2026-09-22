@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { horizon } from '../../src/world/horizon';
-import { GATE_X, STANDARD_X, lanternAnchor } from '../../src/world/foreground';
+import { GATE_X, STANDARD_X, lanternAnchor, railStandards } from '../../src/world/foreground';
+import { lampSpots } from '../../src/world/bloom';
+import { effectsFor } from '../../src/world/weather';
 
 const hz = horizon(900, 900 * 0.66);
 
@@ -68,5 +70,58 @@ describe('the vignette is drawn last, not baked into the plate', () => {
     for (const earlier of ['water.draw', 'drawWeather', 'drawFog', 'drawLamps']) {
       expect(body.indexOf(earlier), earlier).toBeLessThan(body.indexOf('drawForeground'));
     }
+  });
+});
+
+describe('the standards along the near rail', () => {
+
+  /**
+   * The fault this exists to rule out: `bloom.ts` lit five lamps here that
+   * nothing drew, so five flames hung in the air over the balustrade. It is the
+   * lantern-over-its-own-flame fault in the other direction — there, ironwork
+   * with no light; here, light with no ironwork.
+   */
+  it('gives bloom the same positions the posts are drawn at', () => {
+    const spots = lampSpots(1200, hz, [], 0.5, effectsFor('clear'), { x: 0, y: 0 })
+      .filter((s) => s.kind === 'arc' || s.kind === 'street');
+    const posts = railStandards(1200, hz);
+    expect(spots).toHaveLength(posts.length);
+    for (const p of posts) {
+      expect(spots.some((s) => s.x === p.x && s.y === p.y)).toBe(true);
+    }
+  });
+
+  it('calls the electric ones electric', () => {
+    const posts = railStandards(1200, hz);
+    const spots = lampSpots(1200, hz, [], 0.5, effectsFor('clear'), { x: 0, y: 0 });
+    for (const p of posts) {
+      const s = spots.find((q) => q.x === p.x && q.y === p.y)!;
+      expect(s.kind).toBe(p.arc ? 'arc' : 'street');
+    }
+  });
+
+  /** An arc lamp stood taller than the gas it replaced. */
+  it('stands the arc lamps higher than the gas', () => {
+    const posts = railStandards(1200, hz);
+    const arcs = posts.filter((p) => p.arc);
+    const gas = posts.filter((p) => !p.arc);
+    expect(arcs.length).toBeGreaterThan(0);
+    expect(Math.max(...arcs.map((p) => p.y))).toBeLessThan(Math.min(...gas.map((p) => p.y)));
+  });
+
+  /**
+   * At `0.18 + k * 0.19` the last one landed at 0.94, two per cent from the
+   * right gate pier, and the two read as one object.
+   */
+  it('keeps clear of both gate piers and of the near standard', () => {
+    const w = 1200;
+    const others = [GATE_X.left * w, GATE_X.right * w, STANDARD_X * w];
+    for (const p of railStandards(w, hz)) {
+      for (const o of others) expect(Math.abs(p.x - o)).toBeGreaterThan(w * 0.04);
+    }
+  });
+
+  it('stands them all above the parapet', () => {
+    for (const p of railStandards(1200, hz)) expect(p.y).toBeLessThan(hz.railTop);
   });
 });

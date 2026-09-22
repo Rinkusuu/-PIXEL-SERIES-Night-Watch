@@ -5,7 +5,7 @@ import type { Horizon } from './horizon';
 import type { LampSpot } from './water';
 import type { WeatherFx } from './weather';
 import { LAMP_H, REFUGE_H, piers } from './bridge';
-import { lanternAnchor } from './foreground';
+import { lanternAnchor, railStandards } from './foreground';
 import { rand } from './rng';
 import { ARC_LIGHT } from './ladder';
 
@@ -143,25 +143,29 @@ export function lampSpots(
     });
   }
 
-  // Standards along the near rail. Two of the five are electric, and they are
-  // the two at the FAR end — the new lamps went up from one end of the
-  // Embankment, so a mixed row is a row caught mid-replacement.
-  for (let k = 0; k < 5; k++) {
+  // Standards along the near rail. Positions come from foreground.ts — the
+  // module that draws the posts — because this list is also what the river
+  // reflects, so a second copy of these numbers would put a reflection under a
+  // lamp that is not there.
+  //
+  // They were a second copy, and nothing drew the posts at all: five flames
+  // hung in the air over the balustrade.
+  for (const [k, st] of railStandards(w, hz).entries()) {
     out.push({
-      x: Math.round(w * (0.18 + k * 0.19)),
-      y: hz.railTop - 6,
+      x: st.x,
+      y: st.y,
       // An arc lamp is physically bigger and throws further. This is the only
       // place in the app where two lamp kinds sit at the same depth, so it is
       // the only place the size difference can actually be read.
-      r: k >= 3 ? 4 : 3,
+      r: st.arc ? 4 : 3,
       // The electric ones are ALWAYS lit, and the gas comes up behind them as
       // the night deepens. That is the right way round twice over: an arc lamp
       // is thrown by a switch at a generating station, while every gas standard
       // waits for a man with a pole — and it also means the one cold light in
       // the picture is visible from the first frame instead of arriving in the
       // last ten minutes of a session nobody watches to the end.
-      lit: k >= 3 || k < Math.max(1, Math.round((n / TOTAL_LAMPS) * 5)),
-      kind: k >= 3 ? 'arc' : 'street',
+      lit: st.arc || k < Math.max(1, Math.round((n / TOTAL_LAMPS) * 5)),
+      kind: st.arc ? 'arc' : 'street',
     });
   }
 
