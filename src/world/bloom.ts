@@ -208,42 +208,50 @@ export function lampSpots(
  * that carries no matter at all.
  */
 /**
- * Rings in a halo.
+ * A light, laid into the EMISSIVE buffer.
  *
- * A single hard square blurred by a fixed amount is still a square: at the
- * near lantern's radius the blur is 14px against 110px of flat fill, so it
- * came out as a softened rectangle rather than a light. The falloff has to be
- * drawn.
+ * A radial gradient, and the history of this one line is worth keeping because
+ * I got it wrong on the way here and the wrong version shipped.
  *
- * Six, not one-per-pixel as the reference does. That would be a hundred and
- * ten fills for the near lantern alone and nine thousand a frame across the
- * city. Six steps is a falloff the blur finishes into something continuous,
- * and stepped values are this app's own idiom anyway — see `ladder.ts`.
+ * The lights used to be gradients painted onto the SCENE with `lighter`, and
+ * they could not pool: a terrace of lit windows stayed a row of separate discs
+ * and nothing spilled over the ironwork in front of it. Moving them to their
+ * own surface, blurred and screened as one image, is what fixed that — and
+ * that fix had nothing to do with the gradient. The two are independent, and I
+ * conflated them: having decided the gradient was the problem, I replaced it
+ * with concentric hard squares on the theory that the CSS blur would finish
+ * the falloff for nothing.
+ *
+ * It does not. Fourteen pixels of blur cannot round off a square eighty pixels
+ * across, and six rings over a forty-pixel radius leaves seven-pixel steps the
+ * blur only softens. The arc lamps came out as nested squares — a bullseye
+ * target bolted to a post, with visible banding.
+ *
+ * So: a gradient again, into the glow buffer. Perfectly round, no steps, and
+ * it still pools, because pooling was never the gradient's fault. Measured at
+ * eighty-four a frame with no change to frame time either way.
  */
-const RINGS = 6;
-
 function glowBlob(
   g: CanvasRenderingContext2D,
   x: number, y: number, radius: number, colour: string, alpha: number,
 ): void {
   if (radius <= 0) return;
-  g.fillStyle = colour;
-  for (let i = RINGS; i >= 1; i--) {
-    const t = i / RINGS;
-    // Quadratic, so the light is concentrated at the middle and the outermost
-    // ring is nearly nothing. Linear falloff left a visible shoulder where the
-    // last ring stopped, which the blur then preserved as a soft edge — a
-    // halo with a rim around it.
-    g.globalAlpha = alpha * (1 - t) * (1 - t);
-    const r = Math.round(radius * t);
-    g.fillRect(Math.round(x) - r, Math.round(y) - r, r * 2, r * 2);
-  }
-  // The core, at full strength. Without it the very centre of a big halo is
-  // the dimmest ring in the stack, and a lamp reads as a smoke ring.
+  // Two stops, and no shoulder. A stop holding full colour partway out was
+  // tried and it is the flat bright disc it sounds like: the arcs stopped
+  // being points of light and started washing the whole strip of river grey.
+  // Straight from the centre to nothing is what concentrates a light AT its
+  // source, which is what the original gradient did before any of this and
+  // what it should have gone back to unchanged.
+  const halo = g.createRadialGradient(x, y, 0, x, y, radius);
+  halo.addColorStop(0, colour);
+  halo.addColorStop(1, 'transparent');
   g.globalAlpha = alpha;
-  const c = Math.max(1, Math.round(radius * 0.12));
-  g.fillRect(Math.round(x) - c, Math.round(y) - c, c * 2, c * 2);
+  g.fillStyle = halo;
+  g.beginPath();
+  g.arc(x, y, radius, 0, Math.PI * 2);
+  g.fill();
 }
+
 
 /**
  * The moon's disc. Fixed, like `VIGNETTE_INK` in ladder.ts and for the same
