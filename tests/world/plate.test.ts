@@ -31,35 +31,38 @@ function stubCtx(): CanvasRenderingContext2D {
   });
 }
 
+/* The same stub stands in for both the scene and the emissive buffer. Nothing
+   here is about what was drawn — only about how often the plate is rebuilt —
+   and a second stub would be a second thing to keep in step for no gain. */
 describe('plate caching', () => {
   const v = resolve(NIGHT_KEYS, 0.4, gradesFor(['calm']));
   const base = {
     w: 800, h: 600, deckTop: 396, v, progress: 0.4,
-    timeMs: 0, motion: 1, weather: 'clear' as const,
+    timeMs: 0, motion: 1, weather: 'clear' as const, pointer: null,
   };
 
   it('builds the plate once while nothing visible changes', () => {
     const r = createWorldRenderer();
     const g = stubCtx();
-    for (let i = 0; i < 60; i++) r.frame(g, { ...base, timeMs: i * 16 });
+    for (let i = 0; i < 60; i++) r.frame(g, g, { ...base, timeMs: i * 16 });
     expect(r.plateBuilds()).toBe(1);
   });
 
   it('rebuilds when the deck moves more than the threshold', () => {
     const r = createWorldRenderer();
     const g = stubCtx();
-    r.frame(g, base);
-    r.frame(g, { ...base, deckTop: 398 });
+    r.frame(g, g, base);
+    r.frame(g, g, { ...base, deckTop: 398 });
     expect(r.plateBuilds()).toBe(1);
-    r.frame(g, { ...base, deckTop: 420 });
+    r.frame(g, g, { ...base, deckTop: 420 });
     expect(r.plateBuilds()).toBe(2);
   });
 
   it('rebuilds when the weather changes', () => {
     const r = createWorldRenderer();
     const g = stubCtx();
-    r.frame(g, base);
-    r.frame(g, { ...base, weather: 'rain' as const });
+    r.frame(g, g, base);
+    r.frame(g, g, { ...base, weather: 'rain' as const });
     expect(r.plateBuilds()).toBe(2);
   });
 });

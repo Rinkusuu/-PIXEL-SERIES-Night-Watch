@@ -87,7 +87,7 @@ const PLATE_DIM = '#7b868c';
  * job is that its corners stay dark and empty.
  */
 export function drawPostcard(
-  source: HTMLCanvasElement, f: PostcardFacts,
+  source: HTMLCanvasElement, f: PostcardFacts, glow?: HTMLCanvasElement | null,
 ): HTMLCanvasElement {
   const w = source.width;
   // Everything on the plate is sized from the width, so a postcard taken on a
@@ -104,6 +104,26 @@ export function drawPostcard(
 
   g.imageSmoothingEnabled = false;
   g.drawImage(source, 0, 0);
+
+  /* The bloom, or the postcard is not of what you were looking at.
+     The scene and the light live on two surfaces now, and only one of them is
+     `source`. Captured without this the plate came out flat — every halo gone,
+     every lit window a dull square — which is a worse lie than no postcard,
+     because it looks like the app and is not.
+     `filter` and `screen` here do in canvas exactly what the stylesheet does
+     in the page: one blur over the whole emissive buffer, screened back. The
+     blur is scaled from the width for the same reason everything else on this
+     plate is — the page blurs 14px at CSS resolution, and this buffer may be
+     any size. */
+  if (glow) {
+    g.save();
+    g.imageSmoothingEnabled = true;
+    g.filter = `blur(${Math.max(4, Math.round(w / 108))}px) saturate(1.2)`;
+    g.globalCompositeOperation = 'screen';
+    g.globalAlpha = 0.9;
+    g.drawImage(glow, 0, 0, glow.width, glow.height, 0, 0, w, source.height);
+    g.restore();
+  }
 
   const top = source.height;
   g.fillStyle = PLATE_INK;

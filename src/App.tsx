@@ -19,6 +19,8 @@ export function App() {
   /** The world canvas, for the postcard. Owned here because the action needs it
       and the component that draws it does not know the night's facts. */
   const worldRef = useRef<HTMLCanvasElement | null>(null);
+  /** The emissive buffer, so a postcard carries the light as well as the view. */
+  const glowRef = useRef<HTMLCanvasElement | null>(null);
   const [deckTop, setDeckTop] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -137,7 +139,7 @@ export function App() {
       minutes: nw.tonight.minutes,
       sessions: nw.tonight.count,
       streak: nw.streak,
-    }), nw.tonight.key);
+    }, glowRef.current), nw.tonight.key);
   }, [nw.tonight, nw.weather, nw.streak]);
 
   const commands = useMemo(() => buildCommands({
@@ -171,6 +173,7 @@ export function App() {
         onSkip={(bounces) => { if (bounces >= 5) nw.actions.note('stone'); }}
         onWindow={({ x, y }) => setOverheard(dwellerAt(x, y))}
         onCanvas={(el) => { worldRef.current = el; }}
+        onGlowCanvas={(el) => { glowRef.current = el; }}
       />
       <main className="app">
         {/* The page had three h2 panels and nothing above them, so a screen

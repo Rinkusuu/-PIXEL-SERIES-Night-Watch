@@ -5,7 +5,7 @@ import { drawStatic, inkFor } from './layers';
 import { drawWalker } from './figure';
 import { drawFog } from './fog';
 import { drawShafts } from './shafts';
-import { drawLamps, lampSpots, moonPos } from './bloom';
+import { drawLamps, drawPointerLantern, lampSpots, moonPos } from './bloom';
 import type { LampSpot } from './water';
 import { SQUASH, createWater, stoneSkip } from './water';
 import { drawForeground } from './foreground';
@@ -50,6 +50,16 @@ export type FrameInput = {
   timeMs: number;
   motion: number;
   weather: Weather;
+  /**
+   * Where the pointer is over the WORLD, or null when it is over the chrome,
+   * off the window, or on a touch screen that has no hover to speak of.
+   *
+   * In scene coordinates, not client ones. The canvas is one CSS pixel per
+   * drawn pixel so they happen to agree today, and writing the conversion at
+   * the one place that owns the buffer keeps that a coincidence rather than an
+   * assumption spread through the renderer.
+   */
+  pointer: { x: number; y: number } | null;
 };
 
 export function createWorldRenderer() {
@@ -84,7 +94,18 @@ export function createWorldRenderer() {
     plate = null;
   }
 
-  function frame(target: CanvasRenderingContext2D, input: FrameInput): void {
+  /**
+   * `glow` is the emissive buffer: a second surface, the same size, carrying
+   * nothing but light. CSS blurs it once and screen-blends it over the scene,
+   * which is real bloom for the price of one blur — and, more to the point, it
+   * is the only way the lights in this picture can belong to the same air
+   * instead of each being sealed inside its own gradient.
+   */
+  function frame(
+    target: CanvasRenderingContext2D,
+    glow: CanvasRenderingContext2D,
+    input: FrameInput,
+  ): void {
     const started = typeof performance !== 'undefined' ? performance.now() : 0;
     const { w, h, v, progress, timeMs, motion, weather } = input;
     const hz = horizon(h, input.deckTop);
@@ -158,6 +179,10 @@ export function createWorldRenderer() {
     litWindows = lamps.filter((l) => l.lit && l.kind === 'window');
 
     target.clearRect(0, 0, w, h);
+    // CLEARED, not painted over. Its transparent pixels are what `screen`
+    // leaves alone; a black fill would be screened too and lift the whole
+    // frame off its own black.
+    glow.clearRect(0, 0, w, h);
     if (plate) target.drawImage(plate, 0, 0);
 
     water.draw(target, w, hz, v, mirror, lamps, timeMs, motion, notch);
@@ -177,7 +202,10 @@ export function createWorldRenderer() {
     // is the beam's source, so it must go on top or the lamp ends up behind its
     // own light. See shafts.ts.
     drawShafts(target, hz, v, lamps, fx.fogScale);
-    drawLamps(target, v, lamps, fx, timeMs, motion);
+    drawLamps(target, glow, v, lamps, fx, timeMs, motion);
+    // Last into the emissive buffer, so it lights everything the passes above
+    // just put there rather than being lit by them.
+    drawPointerLantern(glow, v, input.pointer, timeMs, motion);
 
     // The near vignette goes LAST. It is the closest thing in the picture, so
     // nothing may be painted over it — least of all the river, which would wash

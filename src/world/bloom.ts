@@ -186,19 +186,63 @@ export function lampSpots(
   return out;
 }
 
+/**
+ * A light, laid into the EMISSIVE buffer.
+ *
+ * This was a `createRadialGradient` per lamp — eighty-four of them a frame,
+ * measured — painted straight onto the scene with `globalCompositeOperation =
+ * 'lighter'`. That works, and it was never the slow part; what it cannot do is
+ * make two lights belong to the same air. A gradient is bounded by its own
+ * radius, so a street of lit windows stayed a row of separate discs instead of
+ * pooling into one glow, and none of it could spill over the black ironwork in
+ * front of it — which is precisely what a flame does behind a lantern frame.
+ *
+ * So the softening moves out of the canvas and into one CSS blur over the
+ * whole buffer. What is drawn here is deliberately HARD: a filled square, no
+ * gradient, no falloff. The blur is what turns it into light, and it turns all
+ * of them into light together.
+ *
+ * This is also the pixel rule doing real work rather than being quoted at.
+ * Matter is quantised and light is not: the emissive buffer is the one surface
+ * in the app allowed to be continuous, and it earns that by being the only one
+ * that carries no matter at all.
+ */
+/**
+ * Rings in a halo.
+ *
+ * A single hard square blurred by a fixed amount is still a square: at the
+ * near lantern's radius the blur is 14px against 110px of flat fill, so it
+ * came out as a softened rectangle rather than a light. The falloff has to be
+ * drawn.
+ *
+ * Six, not one-per-pixel as the reference does. That would be a hundred and
+ * ten fills for the near lantern alone and nine thousand a frame across the
+ * city. Six steps is a falloff the blur finishes into something continuous,
+ * and stepped values are this app's own idiom anyway — see `ladder.ts`.
+ */
+const RINGS = 6;
+
 function glowBlob(
   g: CanvasRenderingContext2D,
   x: number, y: number, radius: number, colour: string, alpha: number,
 ): void {
   if (radius <= 0) return;
-  const halo = g.createRadialGradient(x, y, 0, x, y, radius);
-  halo.addColorStop(0, colour);
-  halo.addColorStop(1, 'transparent');
+  g.fillStyle = colour;
+  for (let i = RINGS; i >= 1; i--) {
+    const t = i / RINGS;
+    // Quadratic, so the light is concentrated at the middle and the outermost
+    // ring is nearly nothing. Linear falloff left a visible shoulder where the
+    // last ring stopped, which the blur then preserved as a soft edge — a
+    // halo with a rim around it.
+    g.globalAlpha = alpha * (1 - t) * (1 - t);
+    const r = Math.round(radius * t);
+    g.fillRect(Math.round(x) - r, Math.round(y) - r, r * 2, r * 2);
+  }
+  // The core, at full strength. Without it the very centre of a big halo is
+  // the dimmest ring in the stack, and a lamp reads as a smoke ring.
   g.globalAlpha = alpha;
-  g.fillStyle = halo;
-  g.beginPath();
-  g.arc(x, y, radius, 0, Math.PI * 2);
-  g.fill();
+  const c = Math.max(1, Math.round(radius * 0.12));
+  g.fillRect(Math.round(x) - c, Math.round(y) - c, c * 2, c * 2);
 }
 
 /**
@@ -237,16 +281,36 @@ const lightColour = (kind: LampSpot['kind'], glow: string) =>
 
 export function drawLamps(
   g: CanvasRenderingContext2D,
+  glow: CanvasRenderingContext2D,
   v: AmbientValues,
   lamps: readonly LampSpot[],
   fx: WeatherFx,
   timeMs: number,
   motion: number,
 ): void {
-  // Emissive things are HOLES in the hatching, drawn after it. If everything
-  // glowed, nothing would. Addendum §C.2.
+  /* TWO surfaces, and which half of a light goes where is the whole point.
+     The pixel rule is not decoration here, it is the API: matter is quantised,
+     light is not.
+
+       · The CORE — the lit pane, the burning clock face — is MATTER. It is a
+         hole cut in the plate's dark window, it has an edge, and it stays on
+         the scene buffer where that edge survives. Sent to the blur it became
+         a fuzzy smudge where a lit window used to be, which is the one thing
+         this refactor had to avoid.
+
+       · The HALO is LIGHT. It goes to the emissive buffer, which CSS blurs as
+         one image — so the halos of a lit terrace run together into a single
+         pool the way they do over a real street, and they spill over the black
+         ironwork in front of them the way a flame spills over a lantern frame.
+         Eighty-four separate radial gradients could do neither.
+
+     Emissive things are still HOLES in the hatching, drawn after it. If
+     everything glowed, nothing would. Addendum §C.2. */
   g.save();
+  glow.save();
   g.globalCompositeOperation = 'lighter';
+  glow.globalCompositeOperation = 'lighter';
+
   for (const [i, s] of lamps.entries()) {
     if (!s.lit) continue;
     const pulse = 1 + Math.sin(timeMs / 900 + i) * 0.06 * motion;
@@ -261,8 +325,11 @@ export function drawLamps(
       // everything else, so it genuinely does wash over the near buildings. It
       // swells with the fog and all but vanishes on the clearest night, which
       // ties the weather to the moon without adding a knob for it.
+      //
+      // All light, no matter — so it is the one entry here with nothing on the
+      // scene buffer at all.
       glowBlob(
-        g, s.x, s.y,
+        glow, s.x, s.y,
         rad * HALO.moon * 2.6 * (0.6 + fx.fogScale * 0.5),
         v.glow, 0.05 + fx.fogScale * 0.05,
       );
@@ -275,10 +342,11 @@ export function drawLamps(
     // spills further through the glass, but the pane it spills through is the
     // same size. Scaling both would just make some windows bigger.
     glowBlob(
-      g, s.x, s.y,
+      glow, s.x, s.y,
       rad * HALO[s.kind] * fx.haloScale * (0.6 + power * 0.5),
       colour, Math.min(0.9, ALPHA[s.kind] * power),
     );
+
     g.globalAlpha = Math.min(1, 0.45 + power * 0.45);
     g.fillStyle = colour;
     if (s.kind === 'clockface') {
@@ -293,5 +361,49 @@ export function drawLamps(
     }
     g.fillRect(s.x - rad / 2, s.y - rad, Math.max(2, rad), rad * 2.4);
   }
+
+  glow.restore();
   g.restore();
 }
+
+
+/**
+ * The pool of light the pointer carries.
+ *
+ * The cheapest magic in the reference project, and it applies here at every
+ * moment rather than half of them: that world dims it toward noon, and this
+ * one has no noon. You are a watchman with a lantern; the lantern moves with
+ * you.
+ *
+ * It exists at all because the emissive buffer does. On the scene surface this
+ * would have been a pale disc lying ON TOP of the river and the stone — a
+ * flashlight cursor. Screened in through the blur it lifts whatever is already
+ * underneath it, so the water genuinely brightens where you hold it and the
+ * ironwork it crosses catches an edge.
+ *
+ * Its size breathes, slowly, and only while `motion` allows. Nothing else in
+ * the frame moves with the pointer, so a perfectly rigid disc reads as a UI
+ * element that escaped onto the canvas.
+ */
+export function drawPointerLantern(
+  glow: CanvasRenderingContext2D,
+  v: AmbientValues,
+  at: { x: number; y: number } | null,
+  timeMs: number,
+  motion: number,
+): void {
+  if (!at) return;
+  glow.save();
+  glow.globalCompositeOperation = 'lighter';
+  const breath = 1 + Math.sin(timeMs / 1700) * 0.05 * motion;
+  glowBlob(glow, at.x, at.y, LANTERN_R * breath, v.glow, LANTERN_ALPHA);
+  glow.restore();
+}
+
+/**
+ * Wide and weak, on purpose. A tight bright pool is a torch beam and turns the
+ * scene into a game about looking at one thing; this is a lantern held at arm's
+ * length, which lifts a whole corner of the picture by very little.
+ */
+const LANTERN_R = 80;
+const LANTERN_ALPHA = 0.26;

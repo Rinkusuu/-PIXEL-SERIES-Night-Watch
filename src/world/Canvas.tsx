@@ -25,25 +25,47 @@ type Props = {
    * version the viewer is actually looking at and the one worth keeping.
    */
   onCanvas?: (canvas: HTMLCanvasElement | null) => void;
+  /** The emissive buffer, so a postcard can carry the light too. */
+  onGlowCanvas?: (canvas: HTMLCanvasElement | null) => void;
 };
 
-export function World({ values, progress, motion, weather, deckTop, zen, onSkip, onWindow, onCanvas }: Props) {
+export function World({ values, progress, motion, weather, deckTop, zen, onSkip, onWindow, onCanvas, onGlowCanvas }: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
+  /**
+   * The emissive buffer, as its own element.
+   *
+   * It is NOT blown up to the device like the scene is. The scene is matter and
+   * every edge of it has to land on a hard device pixel; this carries only
+   * light, CSS blurs it to nothing recognisable anyway, and a 3024-wide surface
+   * to blur instead of a 1512-wide one is twice the work for a result no eye
+   * can tell apart. The pixel rule, spent where it buys something.
+   */
+  const glowRef = useRef<HTMLCanvasElement>(null);
   // Read through a ref so the rAF loop is started exactly once.
   const latest = useRef({ values, progress, motion, weather, deckTop, zen, onSkip, onWindow });
   latest.current = { values, progress, motion, weather, deckTop, zen, onSkip, onWindow };
 
   useEffect(() => {
     const cv = ref.current;
-    if (!cv) return;
+    const gv = glowRef.current;
+    if (!cv || !gv) return;
     const g = cv.getContext('2d');
-    if (!g) return;
+    const gg = gv.getContext('2d');
+    if (!g || !gg) return;
 
     const buffer = document.createElement('canvas');
     const bg = buffer.getContext('2d');
     if (!bg) return;
 
     const renderer = createWorldRenderer();
+    /**
+     * Where the pointer is over the world, for the lantern it carries.
+     *
+     * A ref, not state: it changes on every mouse move and the render loop is
+     * already reading everything else through one. Putting it in React state
+     * would re-render the whole tree at the rate of a mouse.
+     */
+    const pointer = { x: 0, y: 0, active: false };
     let raf = 0;
     let w = 0;
     let h = 0;
@@ -66,6 +88,12 @@ export function World({ values, progress, motion, weather, deckTop, zen, onSkip,
       cv.style.height = `${h}px`;
       buffer.width = w;
       buffer.height = h;
+      // One CSS pixel per drawn pixel, same as the scene buffer, so a light
+      // lands exactly over the thing that is emitting it.
+      gv.width = w;
+      gv.height = h;
+      gv.style.width = `${w}px`;
+      gv.style.height = `${h}px`;
       bg.setTransform(1, 0, 0, 1, 0, 0);
       bg.imageSmoothingEnabled = false;
       g.setTransform(1, 0, 0, 1, 0, 0);
@@ -81,7 +109,8 @@ export function World({ values, progress, motion, weather, deckTop, zen, onSkip,
 
     const loop = (t: number) => {
       const s = latest.current;
-      renderer.frame(bg, {
+      renderer.frame(bg, gg, {
+        pointer: pointer.active ? { x: pointer.x, y: pointer.y } : null,
         w,
         h,
         // Zen ignores the measured row: there is no glass to rest on. See
@@ -108,6 +137,26 @@ export function World({ values, progress, motion, weather, deckTop, zen, onSkip,
      * the same guard the reference project uses, and for the same reason: with
      * it absent, dragging a slider throws a stone into the water behind it.
      */
+    /**
+     * Touch is excluded on purpose. A finger has no hover: the lantern would
+     * light up wherever you last tapped and then sit there, which is not a
+     * lantern, it is a stain. Mouse and pen only.
+     */
+    const overChrome = (t: EventTarget | null) =>
+      !!(t as Element | null)?.closest?.('.app, .cmd, .topbar');
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (e.pointerType === 'touch') { pointer.active = false; return; }
+      // Over the glass the lantern would be a bright smudge behind a panel you
+      // are reading. The same guard the stone throw uses, for the same reason.
+      pointer.active = !overChrome(e.target);
+      pointer.x = e.clientX;
+      pointer.y = e.clientY;
+    };
+    // Leaving the window puts the lantern out. Without this it stays burning
+    // at the last place the pointer was, for as long as the tab is open.
+    const onPointerOut = () => { pointer.active = false; };
+
     const onPointerDown = (e: PointerEvent) => {
       const t = e.target as Element | null;
       if (t?.closest?.('.app, .cmd, .topbar')) return;
@@ -125,20 +174,33 @@ export function World({ values, progress, motion, weather, deckTop, zen, onSkip,
     raf = requestAnimationFrame(loop);
     window.addEventListener('resize', onResize);
     window.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointermove', onPointerMove, { passive: true });
+    window.addEventListener('pointerleave', onPointerOut);
+    window.addEventListener('blur', onPointerOut);
 
     return () => {
       cancelAnimationFrame(raf);
       window.clearTimeout(resizeTimer);
       window.removeEventListener('resize', onResize);
       window.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerleave', onPointerOut);
+      window.removeEventListener('blur', onPointerOut);
     };
   }, []);
 
   return (
-    <canvas
-      ref={(el) => { ref.current = el; onCanvas?.(el); }}
-      className="world"
-      aria-hidden="true"
-    />
+    <>
+      <canvas
+        ref={(el) => { ref.current = el; onCanvas?.(el); }}
+        className="world"
+        aria-hidden="true"
+      />
+      <canvas
+        ref={(el) => { glowRef.current = el; onGlowCanvas?.(el); }}
+        className="world world--glow"
+        aria-hidden="true"
+      />
+    </>
   );
 }

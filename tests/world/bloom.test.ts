@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { horizon } from '../../src/world/horizon';
 import { openings, skyline } from '../../src/world/city';
 import { effectsFor } from '../../src/world/weather';
-import { drawLamps, lampSpots, moonPos } from '../../src/world/bloom';
+import { drawLamps, drawPointerLantern, lampSpots, moonPos } from '../../src/world/bloom';
 import { resolve } from '../../src/ambient/interpolate';
 import { NIGHT_KEYS } from '../../src/ambient/keyframes';
 import { gradesFor } from '../../src/ambient/grade';
@@ -153,15 +153,20 @@ describe('the moon carries the picture', () => {
   it('wears a corona that is moisture, not light', () => {
     // The corona swells with the fog and all but vanishes on the clearest
     // night. That is what ties the weather to the moon without a knob for it.
+    /* Measured off `fillRect`, not off `createRadialGradient`.
+       The corona used to be a radial gradient painted onto the scene; it is a
+       hard square in the emissive buffer now, and CSS does the softening for
+       the whole buffer at once. The rule this test states did not change — the
+       corona still swells with the fog — only the thing that carries it, so
+       the spy moves and the assertion stays.
+       The spot list is filtered to the moon, which has no core, so the one
+       `fillRect` here is the corona. */
     const radii: number[] = [];
     const alphas: number[] = [];
     const g = new Proxy({} as CanvasRenderingContext2D, {
       get(_t, key) {
-        if (key === 'createRadialGradient') {
-          return (_x0: number, _y0: number, _r0: number, _x1: number, _y1: number, r1: number) => {
-            radii.push(r1);
-            return { addColorStop: () => {} };
-          };
+        if (key === 'fillRect') {
+          return (_x: number, _y: number, wide: number) => { radii.push(wide); };
         }
         return () => {};
       },
@@ -176,7 +181,7 @@ describe('the moon carries the picture', () => {
       const v = resolve(NIGHT_KEYS, 0.35, gradesFor(['calm']));
       const spots = lampSpots(1200, hz, blocks, 0.35, effectsFor(weather),
                               moonPos(1200, hz, 0.35));
-      drawLamps(g, v, spots.filter((s) => s.kind === 'moon'), effectsFor(weather), 0, 0);
+      drawLamps(g, g, v, spots.filter((s) => s.kind === 'moon'), effectsFor(weather), 0, 0);
       return { radii: [...radii], alphas: [...alphas] };
     };
 
@@ -189,9 +194,16 @@ describe('the moon carries the picture', () => {
     // moon floated in front of the buildings. What is left here is the wide
     // corona, which belongs in front — it is moisture in the air between you
     // and everything else.
-    expect(clear.radii.length).toBe(1);
-    // And it grows in the fog.
-    expect(fog.radii[0]).toBeGreaterThan(clear.radii[0]!);
+    // ONE halo, however many fills it is made of. It used to be a single
+    // radial gradient and the test counted fills to say so; the halo is a
+    // stack of concentric rings now, so counting fills counts the rings
+    // instead. What still has to hold is that the moon draws one halo and
+    // nothing else — no core, because a corona is all light and no matter.
+    expect(clear.radii.length).toBe(fog.radii.length);
+    expect(clear.radii.length).toBeGreaterThan(1);
+    // And it grows in the fog. Measured at the OUTERMOST ring, which is the
+    // only part of a stack that says how far the light reaches.
+    expect(Math.max(...fog.radii)).toBeGreaterThan(Math.max(...clear.radii));
   });
 
   it('grows again on a full moon', () => {
@@ -199,5 +211,85 @@ describe('the moon carries the picture', () => {
     const full = lampSpots(1440, hz, blocks, 0.5, effectsFor('fullmoon'), moonPos(1440, hz, 0.5));
     const r = (s: typeof plain) => s.find((v) => v.kind === 'moon')!.r;
     expect(r(full)).toBeGreaterThan(r(plain));
+  });
+});
+
+describe('two surfaces', () => {
+  /** Records which context each call landed on, and what shape it was. */
+  function spy() {
+    const calls: { fn: string; args: number[] }[] = [];
+    const ctx = new Proxy({} as CanvasRenderingContext2D, {
+      get: (_t, key) => (...args: unknown[]) => {
+        calls.push({ fn: String(key), args: args.filter((a) => typeof a === 'number') as number[] });
+      },
+      set: () => true,
+    });
+    return { ctx, calls };
+  }
+
+  const v = resolve(NIGHT_KEYS, 0.4, gradesFor(['calm']));
+
+  /**
+   * The rule the refactor exists to hold, and the one a later tidy-up would
+   * break first by collapsing the two surfaces back into one:
+   *
+   *   the CORE is matter and stays on the scene, where its edge survives;
+   *   the HALO is light and goes to the emissive buffer, where a single CSS
+   *   blur turns a terrace of them into one pool.
+   *
+   * Sent to the blur the core became a smudge where a lit window used to be.
+   */
+  it('puts lit panes on the scene and their halos in the emissive buffer', () => {
+    const scene = spy();
+    const glow = spy();
+    const spots = lampSpots(1200, hz, blocks, 0.5, effectsFor('clear'), moonPos(1200, hz, 0.5));
+    drawLamps(scene.ctx, glow.ctx, v, spots, effectsFor('clear'), 0, 0);
+
+    expect(scene.calls.some((c) => c.fn === 'fillRect')).toBe(true);
+    expect(glow.calls.some((c) => c.fn === 'fillRect')).toBe(true);
+  });
+
+  /** Nothing is softened in canvas any more; the stylesheet does it, once. */
+  it('builds no radial gradients at all', () => {
+    const scene = spy();
+    const glow = spy();
+    const spots = lampSpots(1200, hz, blocks, 0.5, effectsFor('fog'), moonPos(1200, hz, 0.5));
+    drawLamps(scene.ctx, glow.ctx, v, spots, effectsFor('fog'), 0, 0);
+    for (const c of [...scene.calls, ...glow.calls]) {
+      expect(c.fn).not.toBe('createRadialGradient');
+    }
+  });
+
+  /**
+   * A halo is drawn as concentric rings because one hard square blurred by a
+   * fixed amount is still a square — at the near lantern's radius the blur is
+   * 14px against 110px of flat fill.
+   */
+  it('draws a halo as a falloff, not as one flat square', () => {
+    const glow = spy();
+    const scene = spy();
+    const one = lampSpots(1200, hz, blocks, 0.5, effectsFor('clear'), moonPos(1200, hz, 0.5))
+      .filter((s) => s.kind === 'lantern');
+    expect(one).toHaveLength(1);
+    drawLamps(scene.ctx, glow.ctx, v, one, effectsFor('clear'), 0, 0);
+    const widths = glow.calls.filter((c) => c.fn === 'fillRect').map((c) => c.args[2]!);
+    expect(widths.length).toBeGreaterThan(3);
+    // They must actually differ, or it is one square drawn several times.
+    expect(new Set(widths).size).toBeGreaterThan(3);
+  });
+
+  /** The pointer's lantern is all light: nothing of it belongs on the scene. */
+  it('keeps the pointer lantern out of the scene buffer entirely', () => {
+    const scene = spy();
+    const glow = spy();
+    drawPointerLantern(glow.ctx, v, { x: 400, y: 300 }, 0, 1);
+    expect(glow.calls.some((c) => c.fn === 'fillRect')).toBe(true);
+    expect(scene.calls).toHaveLength(0);
+  });
+
+  it('draws nothing when the pointer is off the world', () => {
+    const glow = spy();
+    drawPointerLantern(glow.ctx, v, null, 0, 1);
+    expect(glow.calls).toHaveLength(0);
   });
 });

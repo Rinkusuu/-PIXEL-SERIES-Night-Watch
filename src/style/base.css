@@ -20,6 +20,49 @@ body {
   display: block;
 }
 
+/* ── The emissive buffer ─────────────────────────────────────────────────────
+   Nothing but light is drawn into this: lamp halos, the moon's corona, the
+   pool the pointer casts. It is blurred once, as one image, and screened back
+   over the scene.
+
+   That single blur is what the eighty-four separate radial gradients it
+   replaced could never do. A gradient is sealed inside its own radius, so a
+   terrace of lit windows stayed a row of discs; blurred together they run into
+   one pool of light the way they do over a real street, and they spill over
+   the black ironwork in front of them the way a flame spills over the frame of
+   the lantern holding it.
+
+   `screen` and not `plus-lighter`: screen cannot drive a channel past 1, so a
+   dozen overlapping halos brighten toward white and stop, where additive
+   blending would clip to flat paper wherever they piled up — which is exactly
+   where the picture is busiest.
+
+   It is drawn at CSS resolution and stretched, deliberately. The scene is
+   matter and every edge of it lands on a hard device pixel; this is light, the
+   blur destroys the sampling grid anyway, and the rule the whole app is built
+   on says light is the half that is not quantised. */
+.world--glow {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: blur(14px) saturate(1.2);
+  mix-blend-mode: screen;
+  opacity: 0.9;
+  pointer-events: none;
+  /* Promoted, so the blur is computed once on the GPU and the compositor
+     reuses it. Without this the filter is re-evaluated on every frame the
+     canvas is touched, which is every frame. */
+  will-change: opacity;
+}
+
+@media (max-width: 700px) {
+  /* Blur is the most expensive pixel operation a mobile GPU does. */
+  .world--glow { filter: blur(9px) saturate(1.15); }
+}
+
 /* Chrome layer. Docked to the bottom so the glass rests on the balustrade
    instead of covering the river it is supposed to be standing over. */
 .app {
