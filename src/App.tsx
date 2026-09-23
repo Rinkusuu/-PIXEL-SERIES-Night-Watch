@@ -214,6 +214,8 @@ export function App() {
             held={held}
             onToggleHold={nw.actions.toggleHold}
             onCycleMotion={nw.actions.cycleMotion}
+            onToggleAmbience={nw.actions.toggleAmbience}
+            onAmbienceVolume={nw.actions.setAmbienceVolume}
           />
           <TheQuarry
             quarry={nw.data.quarry}

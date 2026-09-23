@@ -695,3 +695,13 @@
   outline: 2px solid var(--amb-lift);
   outline-offset: 0;
 }
+
+/* The one slider in the app. Everything else is a switch, because everything
+   else is a decision the design can make for you — how loud a sound should be
+   in your room is not. */
+.settings__vol {
+  flex: none;
+  width: 90px;
+  accent-color: var(--amb-glow);
+  cursor: pointer;
+}

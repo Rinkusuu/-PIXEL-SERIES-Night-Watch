@@ -15,12 +15,15 @@ import { HUNT_RANGE, RESPITE_RANGE, type Alerts, type Settings as S } from '../s
  */
 export function Settings({
   settings, open, onDurations, onToggleAlert, onCycleMotion, onExport, onImport,
+  onToggleAmbience, onAmbienceVolume,
 }: {
   settings: S;
   open: boolean;
   onDurations: (hunt: number, respite: number) => void;
   onToggleAlert: (key: keyof Alerts) => void;
   onCycleMotion: () => void;
+  onToggleAmbience: () => void;
+  onAmbienceVolume: (v: number) => void;
   onExport: () => void;
   onImport: () => void;
 }) {
@@ -87,6 +90,33 @@ export function Settings({
         <div className="settings__opts">
           <Button onClick={onExport}>{COPY.settings.save}</Button>
           <Button onClick={onImport}>{COPY.settings.load}</Button>
+        </div>
+      </div>
+
+      {/* Under the alerts, because it is the same kind of thing: a channel
+          the app is allowed to use. Above motion, because it is the one a
+          reader is far more likely to come looking for. */}
+      <div className="settings__row">
+        <span className="label">{COPY.settings.ambience}</span>
+        <div className="settings__opts">
+          <Button onClick={onToggleAmbience} pressed={settings.ambience}>
+            {settings.ambience ? COPY.settings.ambienceOn : COPY.settings.ambienceOff}
+          </Button>
+          {/* The slider appears only once the sound is on. A volume control
+              over silence is a control that does nothing, and this panel has
+              no room for anything that does nothing. */}
+          {settings.ambience && (
+            <input
+              className="settings__vol"
+              type="range"
+              min={0}
+              max={100}
+              value={Math.round(settings.ambienceVolume * 100)}
+              aria-label={COPY.settings.ambienceVolume}
+              title={COPY.settings.ambienceVolume}
+              onChange={(e) => onAmbienceVolume(Number(e.target.value) / 100)}
+            />
+          )}
         </div>
       </div>
 

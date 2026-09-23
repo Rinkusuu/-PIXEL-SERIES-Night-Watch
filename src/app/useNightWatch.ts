@@ -23,6 +23,7 @@ import { nightKey } from '../session/streak';
 import { weatherFor, type Weather } from '../world/weather';
 import { seasonOf } from '../world/season';
 import { announce, requestNotify, titleFor } from './alerts';
+import { createAmbience, type Ambience } from './ambience';
 import { COPY, formatClock } from './copy';
 import { HUNT_RANGE, RESPITE_RANGE, clampMinutes, type Alerts } from '../store/schema';
 
@@ -63,6 +64,35 @@ export function useNightWatch() {
    * night this is across the four-o'clock boundary.
    */
   const season = useMemo(() => seasonOf(nightKey(now)), [now]);
+
+  /**
+   * The embankment's own sound.
+   *
+   * Built once and kept in a ref, not in state: it owns an AudioContext and a
+   * three-second noise buffer, and rebuilding it on a render would restart the
+   * river from a different place in its own loop every time anything else in
+   * the app changed.
+   */
+  const ambienceRef = useRef<Ambience | null>(null);
+  if (ambienceRef.current === null) ambienceRef.current = createAmbience();
+
+  /**
+   * Driven by the SETTING, not by the button handler, so the preference
+   * survives a reload — and `enable` knows what to do about the fact that a
+   * reload is not a gesture: it arms itself and comes in at the first touch of
+   * the page. See the note there; this effect does not need to care.
+   */
+  useEffect(() => {
+    const a = ambienceRef.current;
+    if (!a) return;
+    if (data.settings.ambience) a.enable(data.settings.ambienceVolume);
+    else a.disable();
+  }, [data.settings.ambience]);
+
+  useEffect(() => {
+    ambienceRef.current?.setVolume(data.settings.ambienceVolume);
+  }, [data.settings.ambienceVolume]);
+
   const ledger = useMemo(() => minutesByNight(data.sessions, now, 7), [data.sessions, now]);
 
   // The store has kept RETENTION_DAYS of nights since it was written and the
@@ -101,6 +131,15 @@ export function useNightWatch() {
   const weather = useMemo<Weather>(() => weatherFor(tonight), [tonight]);
 
   const progress = progressOf(session, now);
+
+  /**
+   * Fed from the same tick everything else reads, so the weather you can see
+   * and the weather you can hear are the same weather.
+   */
+  useEffect(() => {
+    if (!data.settings.ambience) return;
+    ambienceRef.current?.update(weather, progress, now);
+  }, [data.settings.ambience, weather, progress, now]);
   const remainingMs = remainingOf(session, now);
   const selectedName = data.quarry.find((q) => q.id === session.quarryId)?.name ?? null;
 
@@ -472,6 +511,21 @@ export function useNightWatch() {
      * reason it defaults to off — a permission dialog on first load would be
      * the most intrusive thing in an app with no account and no server.
      */
+    /** One switch. Starting it needs a gesture, and this is one. */
+    toggleAmbience: () => setData((d) => {
+      const next: Schema = {
+        ...d, settings: { ...d.settings, ambience: !d.settings.ambience },
+      };
+      save(next);
+      return next;
+    }),
+    setAmbienceVolume: (v: number) => setData((d) => {
+      const vol = Math.min(1, Math.max(0, v));
+      if (vol === d.settings.ambienceVolume) return d;
+      const next: Schema = { ...d, settings: { ...d.settings, ambienceVolume: vol } };
+      save(next);
+      return next;
+    }),
     toggleAlert: async (key: keyof Alerts) => {
       if (key === 'notify') {
         const granted = await requestNotify();

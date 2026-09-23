@@ -21,6 +21,7 @@ export function TheWatch({
   phase, progress, remainingMs, quarryName, bloodmoon, settings, tonight, weather, overheard,
   settingsOpen, onToggleSettings, onDurations, onToggleAlert,
   onStart, onStop, onSkip, onCycleMotion, onExport, onImport,
+  onToggleAmbience, onAmbienceVolume,
   held, onToggleHold,
 }: {
   phase: Phase;
@@ -43,6 +44,8 @@ export function TheWatch({
   held: boolean;
   onToggleHold: () => void;
   onCycleMotion: () => void;
+  onToggleAmbience: () => void;
+  onAmbienceVolume: (v: number) => void;
   onExport: () => void;
   onImport: () => void;
 }) {
@@ -114,6 +117,8 @@ export function TheWatch({
         onDurations={onDurations}
         onToggleAlert={onToggleAlert}
         onCycleMotion={onCycleMotion}
+        onToggleAmbience={onToggleAmbience}
+        onAmbienceVolume={onAmbienceVolume}
         onExport={onExport}
         onImport={onImport}
       />

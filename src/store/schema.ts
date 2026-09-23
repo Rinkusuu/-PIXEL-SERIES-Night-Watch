@@ -62,6 +62,23 @@ export type Settings = {
   respiteMinutes: number;
   motion: 'auto' | 'on' | 'off';
   alerts: Alerts;
+  /**
+   * The river, the rain, the wind and the hour bell.
+   *
+   * OFF by default, and it has to be. A page that starts playing at you is a
+   * hostile page — and unlike the chime, which speaks once when something has
+   * happened, this runs for the whole watch. It is the one setting here that
+   * changes the room you are sitting in.
+   */
+  ambience: boolean;
+  /**
+   * How loud, 0..1.
+   *
+   * The one place this app carries a slider rather than a switch. Everything
+   * else is a decision the design can make for you; how loud a thing should be
+   * in YOUR room, with your speakers, at your hour of the night, is not.
+   */
+  ambienceVolume: number;
 };
 
 /** Bounds for the two durations. A zero-minute hunt is not a short session. */
@@ -117,6 +134,8 @@ export function emptySchema(): Schema {
       respiteMinutes: 10,
       motion: 'auto',
       alerts: { title: true, chime: true, notify: false },
+      ambience: false,
+      ambienceVolume: 0.5,
     },
   };
 }
