@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { AmbientValues } from '../ambient/types';
 import type { Weather } from './weather';
+import type { Season } from './season';
 import { defaultDeckTop, zenDeckTop } from './horizon';
 import { createWorldRenderer } from './renderer';
 
@@ -9,6 +10,8 @@ type Props = {
   progress: number;
   motion: number;
   weather: Weather;
+  /** Tonight's season. Drives who is out: moths in summer, none in winter. */
+  season: Season;
   /** Top of the glass panel row, in CSS pixels. The balustrade lands here. */
   deckTop: number;
   /** With the glass hidden there is nothing for the parapet to carry. */
@@ -29,7 +32,7 @@ type Props = {
   onGlowCanvas?: (canvas: HTMLCanvasElement | null) => void;
 };
 
-export function World({ values, progress, motion, weather, deckTop, zen, onSkip, onWindow, onCanvas, onGlowCanvas }: Props) {
+export function World({ values, progress, motion, weather, season, deckTop, zen, onSkip, onWindow, onCanvas, onGlowCanvas }: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
   /**
    * The emissive buffer, as its own element.
@@ -42,8 +45,8 @@ export function World({ values, progress, motion, weather, deckTop, zen, onSkip,
    */
   const glowRef = useRef<HTMLCanvasElement>(null);
   // Read through a ref so the rAF loop is started exactly once.
-  const latest = useRef({ values, progress, motion, weather, deckTop, zen, onSkip, onWindow });
-  latest.current = { values, progress, motion, weather, deckTop, zen, onSkip, onWindow };
+  const latest = useRef({ values, progress, motion, weather, season, deckTop, zen, onSkip, onWindow });
+  latest.current = { values, progress, motion, weather, season, deckTop, zen, onSkip, onWindow };
 
   useEffect(() => {
     const cv = ref.current;
@@ -121,6 +124,7 @@ export function World({ values, progress, motion, weather, deckTop, zen, onSkip,
         timeMs: t,
         motion: s.motion,
         weather: s.weather,
+        season: s.season,
       });
       g.clearRect(0, 0, cv.width, cv.height);
       g.drawImage(buffer, 0, 0, buffer.width, buffer.height, 0, 0, cv.width, cv.height);

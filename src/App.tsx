@@ -168,6 +168,7 @@ export function App() {
         progress={nw.progress}
         motion={nw.motion}
         weather={nw.weather}
+        season={nw.season}
         deckTop={deckTop}
         zen={zen}
         onSkip={(bounces) => { if (bounces >= 5) nw.actions.note('stone'); }}

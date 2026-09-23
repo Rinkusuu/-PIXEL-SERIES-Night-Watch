@@ -21,6 +21,7 @@ import type { Schema } from '../store/schema';
 import { motionValue, nextMotion } from './motion';
 import { nightKey } from '../session/streak';
 import { weatherFor, type Weather } from '../world/weather';
+import { seasonOf } from '../world/season';
 import { announce, requestNotify, titleFor } from './alerts';
 import { COPY, formatClock } from './copy';
 import { HUNT_RANGE, RESPITE_RANGE, clampMinutes, type Alerts } from '../store/schema';
@@ -56,6 +57,12 @@ export function useNightWatch() {
   );
 
   const streak = useMemo(() => streakLength(data.sessions, now), [data.sessions, now]);
+  /**
+   * What month the world thinks it is, from the same night key the weather is
+   * seeded with — so the moths and the snow can never disagree about which
+   * night this is across the four-o'clock boundary.
+   */
+  const season = useMemo(() => seasonOf(nightKey(now)), [now]);
   const ledger = useMemo(() => minutesByNight(data.sessions, now, 7), [data.sessions, now]);
 
   // The store has kept RETENTION_DAYS of nights since it was written and the
@@ -536,7 +543,7 @@ export function useNightWatch() {
 
   return {
     session, values, progress, motion, grades, data, remainingMs, streak, ledger, weather,
-    nightsGrid, best, totals, quarryTotals, hours, peakHour, retentionDays: RETENTION_DAYS,
+    nightsGrid, best, totals, quarryTotals, hours, peakHour, season, retentionDays: RETENTION_DAYS,
     tonight: tonightStats,
     recovered: boot.recovered, actions,
   };

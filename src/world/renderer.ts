@@ -6,6 +6,8 @@ import { drawWalker } from './figure';
 import { drawFog } from './fog';
 import { drawShafts } from './shafts';
 import { drawLamps, drawPointerLantern, lampSpots, moonPos } from './bloom';
+import { createLife } from './life';
+import type { Season } from './season';
 import type { LampSpot } from './water';
 import { SQUASH, createWater, stoneSkip } from './water';
 import { drawForeground } from './foreground';
@@ -60,6 +62,13 @@ export type FrameInput = {
    * assumption spread through the renderer.
    */
   pointer: { x: number; y: number } | null;
+  /**
+   * Tonight's season. Passed in rather than read from the clock here: the app
+   * already derives the night key once per tick, and a renderer that calls
+   * `Date.now()` inside its own frame is a renderer that can disagree with the
+   * panel sitting next to it about what month it is.
+   */
+  season: Season;
 };
 
 export function createWorldRenderer() {
@@ -87,6 +96,7 @@ export function createWorldRenderer() {
   let litWindows: LampSpot[] = [];
 
   const water = createWater();
+  const life = createLife();
   const clock = createFrameClock();
   let lastTime = 0;
 
@@ -202,6 +212,14 @@ export function createWorldRenderer() {
     // is the beam's source, so it must go on top or the lamp ends up behind its
     // own light. See shafts.ts.
     drawShafts(target, hz, v, lamps, fx.fogScale);
+    /* Between the halos and the near vignette.
+       After the halos because a moth is only legible as a dark speck crossing
+       one — drawn before them it would be painted over by the very light that
+       makes it visible. Before the vignette because the gate piers and the
+       near lamp are closer than the parapet a rat runs along. */
+    life.update(dt, hz, w, lamps, input.season, fx.rain > 0 || fx.snow > 0, motion);
+    life.draw(target, glow, v, inkFor(v));
+
     drawLamps(target, glow, v, lamps, fx, timeMs, motion);
     // Last into the emissive buffer, so it lights everything the passes above
     // just put there rather than being lit by them.

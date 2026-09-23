@@ -38,7 +38,7 @@ describe('plate caching', () => {
   const v = resolve(NIGHT_KEYS, 0.4, gradesFor(['calm']));
   const base = {
     w: 800, h: 600, deckTop: 396, v, progress: 0.4,
-    timeMs: 0, motion: 1, weather: 'clear' as const, pointer: null,
+    timeMs: 0, motion: 1, weather: 'clear' as const, pointer: null, season: 'autumn' as const,
   };
 
   it('builds the plate once while nothing visible changes', () => {
