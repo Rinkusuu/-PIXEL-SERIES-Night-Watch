@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
-  cityGlowAnchor, cloudBanks, drawSky, starField, starVisibility,
+  CLOUD_STEP, cityGlowAnchor, cloudBanks, cloudDrift, drawClouds, drawSky,
+  drawStars, starField, starVisibility,
 } from '../../src/world/sky';
 import { horizon } from '../../src/world/horizon';
 import { skyline } from '../../src/world/city';
@@ -130,21 +131,36 @@ describe('cityGlowAnchor', () => {
   });
 });
 
+const BANDS_AT_THIS_SEED = cloudBanks(1440, hz, 31 + 991).length;
+
 describe('drawSky', () => {
   it('draws stars on a clear night and none in the fog', () => {
+    // The stars left `drawSky` for a live pass of their own, because a plate
+    // that rebuilds every few minutes cannot twinkle. The rule did not move.
     const clear = countingCtx();
     const foggy = countingCtx();
-    drawSky(clear.g, 1440, hz, v, blocks, moon, 30, effectsFor('clear').fogScale, '#0a0e10', 31);
-    drawSky(foggy.g, 1440, hz, v, blocks, moon, 30, effectsFor('fog').fogScale, '#0a0e10', 31);
+    drawStars(clear.g, 1440, hz, v, moon, effectsFor('clear').fogScale, 0, 31);
+    drawStars(foggy.g, 1440, hz, v, moon, effectsFor('fog').fogScale, 0, 31);
     expect(clear.calls()).toBeGreaterThan(foggy.calls());
   });
 
-  it('goes on the plate behind the city, never in front of it', () => {
+  it('goes behind the city, never in front of it', () => {
     // Order is the whole of depth here. Stars over rooftops would be a bug you
     // could see from across the room.
-    const src = readFileSync('src/world/layers.ts', 'utf8');
-    expect(src.indexOf('drawSky(')).toBeGreaterThan(-1);
-    expect(src.indexOf('drawSky(')).toBeLessThan(src.indexOf('drawSkyline('));
+    //
+    // It used to be enough that `drawSky` came before `drawSkyline` in one
+    // function. The sky is a sandwich now — cached sky, live stars and clouds,
+    // cached ground — so what has to hold is that the renderer puts the live
+    // pass between the two plates and not after them.
+    const src = readFileSync('src/world/renderer.ts', 'utf8');
+    const sky = src.indexOf('drawImage(skyPlate');
+    const stars = src.indexOf('drawStars(');
+    const clouds = src.indexOf('drawClouds(');
+    const ground = src.indexOf('drawImage(plate');
+    for (const i of [sky, stars, clouds, ground]) expect(i).toBeGreaterThan(-1);
+    expect(sky).toBeLessThan(stars);
+    expect(stars).toBeLessThan(clouds);
+    expect(clouds).toBeLessThan(ground);
   });
 
   it('never strokes a cloud, and never outlines one', () => {
@@ -154,43 +170,82 @@ describe('drawSky', () => {
     // a one-pixel line is what stopped this reading as pixel art.
     const c = countingCtx();
     drawSky(c.g, 1440, hz, v, blocks, moon, 30, 1, '#0a0e10', 31);
+    drawClouds(c.g, 1440, hz, v, moon, 0, 1, 31);
     expect(c.strokes()).toBe(0);
   });
 
-  it('washes each bank once from the side the moon is on', () => {
-    let grads = 0;
+  /**
+   * These two asserted that each bank was ONE linear gradient and ONE `fill`.
+   * Both were true of a bank made of ellipses, and neither is a rule — they
+   * were the shape of the fix for a real fault: filling lobe by lobe doubled
+   * the alpha at every overlap and showed each ellipse's outline through the
+   * body, a row of pills instead of a cloud.
+   *
+   * A bank is a run of quantised columns now, each taking the union of every
+   * lobe over it, so that fault cannot occur: there are no lobes in the output
+   * to overlap. What is worth testing is the rule itself.
+   */
+  it('never draws a lobe twice over another', () => {
+    const seen = new Map<number, number>();
     const g = new Proxy({} as CanvasRenderingContext2D, {
-      get(_t, key) {
-        if (key === 'createLinearGradient') {
-          return () => { grads++; return { addColorStop: () => {} }; };
+      get: (_t, key) => (...a: unknown[]) => {
+        if (key === 'fillRect') {
+          const x = a[0] as number;
+          seen.set(x, (seen.get(x) ?? 0) + 1);
         }
-        if (key === 'createRadialGradient') return () => ({ addColorStop: () => {} });
-        return () => {};
+        return undefined;
       },
       set: () => true,
     });
-    drawSky(g, 1440, hz, v, blocks, moon, 30, 1, '#0a0e10', 31);
-    expect(grads).toBe(cloudBanks(1440, hz, 31 + 991).length);
+    drawClouds(g, 1440, hz, v, moon, 0, 1, 31);
+    // Body and lit edge: two rects per column, and never a third.
+    for (const n of seen.values()) expect(n).toBeLessThanOrEqual(2 * BANDS_AT_THIS_SEED);
   });
 
-  it('fills each bank in one path so the lobes do not show through', () => {
-    // Filling lobe by lobe doubles the alpha at every overlap and outlines each
-    // ellipse in the body — a row of pills instead of a cloud.
-    let fills = 0;
+  it('builds a bank out of the pixel grid, not out of curves', () => {
+    const xs: number[] = [];
+    let ellipses = 0;
     const g = new Proxy({} as CanvasRenderingContext2D, {
-      get(_t, key) {
-        if (key === 'createRadialGradient' || key === 'createLinearGradient') {
-          return () => ({ addColorStop: () => {} });
-        }
-        if (key === 'fill') return () => { fills++; };
-        return () => {};
+      get: (_t, key) => (...a: unknown[]) => {
+        if (key === 'fillRect') xs.push(a[0] as number);
+        if (key === 'ellipse' || key === 'arc') ellipses++;
+        return undefined;
       },
       set: () => true,
     });
-    drawSky(g, 1440, hz, v, blocks, moon, 30, 1, '#0a0e10', 31);
-    // One per bank, plus the moon's two: its tight halo and its disc, which
-    // live on the plate so the skyline can occlude them. The dome and the
-    // stars are fillRects and do not count.
-    expect(fills).toBe(cloudBanks(1440, hz, 31 + 991).length + 2);
+    drawClouds(g, 1440, hz, v, moon, 0, 1, 31);
+    // A cloud is matter, and matter is quantised. It was the one object in the
+    // frame drawing its own outline with a compass.
+    expect(ellipses).toBe(0);
+    expect(xs.length).toBeGreaterThan(20);
+    // A bank starts off-frame to the left, so a column's x can be negative and
+    // `-0 % 4` is `-0` — which `toBe(0)` rejects. The claim is divisibility.
+    for (const x of xs) expect(x % CLOUD_STEP === 0).toBe(true);
+  });
+
+  it('drifts, and stops dead when motion is off', () => {
+    const at = (t: number, motion: number) => {
+      const xs: number[] = [];
+      const g = new Proxy({} as CanvasRenderingContext2D, {
+        get: (_t, key) => (...a: unknown[]) => {
+          if (key === 'fillRect') xs.push(a[0] as number);
+          return undefined;
+        },
+        set: () => true,
+      });
+      drawClouds(g, 1440, hz, v, moon, t, motion, 31);
+      return xs.join(',');
+    };
+    expect(at(0, 1)).not.toBe(at(9000, 1));
+    expect(at(0, 0)).toBe(at(9000, 0));
+  });
+
+  it('gives the banks speeds that never line up into one sheet', () => {
+    const a = cloudDrift(60_000, 0, 1);
+    const b = cloudDrift(60_000, 1, 1);
+    const c = cloudDrift(60_000, 2, 1);
+    expect(new Set([a, b, c]).size).toBe(3);
+    // And not all the same way, or three bands read as one.
+    expect(Math.sign(a) === Math.sign(b) && Math.sign(b) === Math.sign(c)).toBe(false);
   });
 });

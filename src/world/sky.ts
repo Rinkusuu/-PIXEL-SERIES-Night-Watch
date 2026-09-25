@@ -116,6 +116,53 @@ export function starVisibility(fogScale: number): number {
   return Math.max(0, 1 - fogScale * 0.55);
 }
 
+/**
+ * The stars, live.
+ *
+ * They were baked onto the cached plate, which rebuilds only when the size,
+ * the weather, the deck or the palette move — so for minutes at a time the
+ * entire sky was a photograph. `drawSky` did not even take a time argument;
+ * there was nothing to animate them WITH.
+ *
+ * The twinkle is an OPACITY change and never a movement, which is why it is
+ * not gated on `motion`: a reader who has turned motion off has asked for
+ * nothing to travel, not for the sky to die. It is the one thing that keeps
+ * breathing when everything else is held still.
+ */
+export function drawStars(
+  g: CanvasRenderingContext2D,
+  w: number,
+  hz: Horizon,
+  v: AmbientValues,
+  moon: { x: number; y: number },
+  fogScale: number,
+  timeMs: number,
+  seed: number,
+): void {
+  const vis = starVisibility(fogScale);
+  if (vis <= 0.02) return;
+  g.save();
+  g.fillStyle = v.lift;
+  for (const [i, s] of starField(w, hz, seed).entries()) {
+    // The moon washes out everything near it, and the haze takes the ones
+    // low down first.
+    const dx = s.x - moon.x;
+    const dy = s.y - moon.y;
+    const near = Math.min(1, Math.hypot(dx, dy) / (w * 0.22));
+    const high = 1 - s.y / Math.max(1, hz.skyBot);
+    // Each star keeps its own period and its own phase. One shared period is a
+    // sky that pulses as a single sheet, which is not twinkling, it is a fault
+    // in the projector.
+    const period = 1400 + (i % 17) * 260;
+    const tw = 0.62 + 0.38 * Math.sin(timeMs / period + i * 1.7);
+    const a = s.a * vis * near * (0.35 + high * 0.65) * tw;
+    if (a < 0.03) continue;
+    g.globalAlpha = a;
+    g.fillRect(s.x, s.y, s.r, s.r);
+  }
+  g.restore();
+}
+
 export function drawSky(
   g: CanvasRenderingContext2D,
   w: number,
@@ -130,28 +177,6 @@ export function drawSky(
   ink: string,
   seed: number,
 ): void {
-  const sky0 = hexToRgb(v.sky[0]);
-
-  // 1 — stars, furthest back.
-  const vis = starVisibility(fogScale);
-  if (vis > 0.02) {
-    g.save();
-    g.fillStyle = v.lift;
-    for (const s of starField(w, hz, seed)) {
-      // The moon washes out everything near it, and the haze takes the ones
-      // low down first.
-      const dx = s.x - moon.x;
-      const dy = s.y - moon.y;
-      const near = Math.min(1, Math.hypot(dx, dy) / (w * 0.22));
-      const high = 1 - s.y / Math.max(1, hz.skyBot);
-      const a = s.a * vis * near * (0.35 + high * 0.65);
-      if (a < 0.03) continue;
-      g.globalAlpha = a;
-      g.fillRect(s.x, s.y, s.r, s.r);
-    }
-    g.restore();
-  }
-
   // 2 — the gas dome over the city. The only honest reason for the sky to vary
   //     horizontally at all.
   const anchor = cityGlowAnchor(blocks, w, hz.cityTop, hz.cityBot);
@@ -199,63 +224,135 @@ export function drawSky(
   g.arc(moon.x, moon.y, moonR, 0, Math.PI * 2);
   g.fill();
   g.restore();
+}
 
-  // 3 — cloud banks. Body a step toward the sky's own darkest stop, so they stay
-  //     on the sky's scale instead of borrowing the depth ladder, which measures
-  //     from the fog and has nothing to say about anything above it.
+/**
+ * The quantum a cloud is built out of.
+ *
+ * Four, the same step the dither tile uses. A cloud was drawn with
+ * `ctx.ellipse` — a smooth curve, in a picture whose first rule is that matter
+ * is quantised and only light is not. A cloud is matter. It was the one object
+ * in the frame drawing its own outline with a compass, and at this scale a
+ * smooth ellipse next to a stepped roofline does not read as softness, it
+ * reads as a different program.
+ */
+export const CLOUD_STEP = 4;
+
+/**
+ * How far a bank has drifted.
+ *
+ * Each band has its own speed and they are not multiples of each other, so the
+ * three never line up into one sliding sheet — the same rule `fogOffset`
+ * follows, for the same reason. Motion zero stops them dead; this is
+ * wide-area travel and it is exactly what §8.1 is about.
+ */
+export function cloudDrift(timeMs: number, band: number, motion: number): number {
+  const speed = [0.0042, -0.0027, 0.0016][band % 3]!;
+  return timeMs * speed * motion;
+}
+
+/**
+ * A bank, as a run of columns rather than a row of ellipses.
+ *
+ * Each column takes the UNION of every lobe covering it — one top, one bottom,
+ * whatever the lobes underneath are doing. That solves by construction the
+ * thing the old path-based version needed a comment to explain: filling lobe
+ * by lobe doubled the alpha wherever two overlapped and showed every lobe's
+ * outline through the body. There are no lobe outlines here. There is a
+ * silhouette, and it is made of pixels.
+ */
+function cloudColumns(lobes: readonly Lobe[]): { x: number; top: number; h: number }[] {
+  const out: { x: number; top: number; h: number }[] = [];
+  const minX = Math.min(...lobes.map((l) => l.x - l.rx));
+  const maxX = Math.max(...lobes.map((l) => l.x + l.rx));
+  for (let cx = Math.floor(minX / CLOUD_STEP) * CLOUD_STEP; cx < maxX; cx += CLOUD_STEP) {
+    const mid = cx + CLOUD_STEP / 2;
+    let top = Infinity;
+    let bot = -Infinity;
+    for (const l of lobes) {
+      const dx = (mid - l.x) / l.rx;
+      if (dx <= -1 || dx >= 1) continue;
+      const dy = l.ry * Math.sqrt(1 - dx * dx);
+      if (l.y - dy < top) top = l.y - dy;
+      if (l.y + dy > bot) bot = l.y + dy;
+    }
+    if (top === Infinity) continue;
+    /* Stepped in x, rounded to the whole pixel in y — NOT quantised to the
+       same coarse step in both.
+       It was, and that is what a staircase looks like when you take the risers
+       away as well as the treads: the banks came out as long flat slabs, and
+       every lobe shorter than the step vanished into the one beside it. The
+       silhouette has to be ragged or no amount of texture makes it read as
+       cloud, and the raggedness lives entirely in the small lobes.
+       Four across and one down is the staircase. That IS the pixel grid; it is
+       only the horizontal run that has to be coarse enough to see. */
+    const qt = Math.round(top);
+    const qb = Math.round(bot);
+    if (qb - qt < 2) continue;
+    out.push({ x: cx, top: qt, h: qb - qt });
+  }
+  return out;
+}
+
+/**
+ * The cloud banks, live and drifting.
+ *
+ * Body a step toward the sky's own darkest stop, so they stay on the sky's
+ * scale instead of borrowing the depth ladder, which measures from the fog and
+ * has nothing to say about anything above it.
+ */
+export function drawClouds(
+  g: CanvasRenderingContext2D,
+  w: number,
+  hz: Horizon,
+  v: AmbientValues,
+  moon: { x: number; y: number },
+  timeMs: number,
+  motion: number,
+  seed: number,
+): void {
+  const sky0 = hexToRgb(v.sky[0]);
   g.save();
-  g.lineWidth = 1;
-  for (const cloud of cloudBanks(w, hz, seed + 991)) {
+  for (const [b, cloud] of cloudBanks(w, hz, seed + 991).entries()) {
+    const cols = cloudColumns(cloud.lobes);
+    if (cols.length === 0) continue;
+
     const spineY = cloud.lobes.reduce((s, l) => s + l.y, 0) / cloud.lobes.length;
     const t = Math.min(1, spineY / Math.max(1, hz.waterTop));
     const local = mixRgb(sky0, hexToRgb(v.sky[1]), t);
+    const body = rgbToHex(mixRgb(local, sky0, 0.62));
 
-    // ONE path for the whole bank. Filling lobe by lobe doubles the alpha
-    // wherever two overlap and shows every lobe's own outline through the
-    // body — a row of pills, not a cloud. `moveTo` before each ellipse or the
-    // subpaths get joined by a line.
-    const trace = () => {
-      g.beginPath();
-      for (const l of cloud.lobes) {
-        g.moveTo(l.x + l.rx, l.y);
-        g.ellipse(l.x, l.y, l.rx, l.ry, 0, 0, Math.PI * 2);
-      }
-    };
-
-    const bankTop = Math.min(...cloud.lobes.map((l) => l.y - l.ry));
-    const bankBot = Math.max(...cloud.lobes.map((l) => l.y + l.ry));
-
-    trace();
-    g.globalAlpha = 0.70;
-    g.fillStyle = rgbToHex(mixRgb(local, sky0, 0.62));
-    g.fill();
-
-    // The side the moon is on, washed in with a gradient INSIDE the bank —
-    // never stroked. `fill` merges overlapping subpaths; `stroke` does not, so
-    // stroking the same path draws a loop of wire around every ellipse in it,
-    // including the ones buried in the middle, and the sky fills with gold
-    // noodles. Canvas will not hand out a union outline, so the lit edge has to
-    // be painted rather than drawn.
+    // The bank is wider than the frame by construction, so its own span is the
+    // wrap period: a clump that leaves the left edge arrives at the right one
+    // still a clump, instead of being torn apart lobe by lobe.
+    const span = cols[cols.length - 1]!.x + CLOUD_STEP - cols[0]!.x;
+    const drift = cloudDrift(timeMs, b, motion);
     const below = moon.y > spineY;
-    g.save();
-    trace();
-    g.clip();
-    const wash = g.createLinearGradient(
-      0, below ? bankTop : bankBot, 0, below ? bankBot : bankTop,
-    );
-    // Only the outer edge catches. A wash that starts at the far side turns the
-    // whole bank into a lamp, and the top of the frame has no business being
-    // the brightest thing in it.
-    wash.addColorStop(0, 'transparent');
-    wash.addColorStop(0.62, 'transparent');
-    // `lift`, not `glow`. The moon is near-white and it is what lights these;
-    // the amber belongs to the gas, and §D says it is the picture's only warm
-    // colour. A sky full of it undoes the whole cold palette.
-    wash.addColorStop(1, v.lift);
-    g.globalAlpha = 0.16;
-    g.fillStyle = wash;
-    g.fillRect(0, bankTop, w, bankBot - bankTop);
-    g.restore();
+
+    for (const c of cols) {
+      let x = c.x + drift;
+      x = ((x - cols[0]!.x) % span + span) % span + cols[0]!.x;
+      if (x > w || x + CLOUD_STEP < 0) continue;
+      const qx = Math.round(x / CLOUD_STEP) * CLOUD_STEP;
+
+      g.globalAlpha = 0.70;
+      g.fillStyle = body;
+      g.fillRect(qx, c.top, CLOUD_STEP, c.h);
+
+      /* The lit edge, as ONE stepped course on the moon's side.
+         It was a linear gradient clipped to the bank — a smooth wash, which is
+         the same fault as the smooth outline, and it needed a long comment
+         about why `stroke` could not be used. A single row of pixels on the
+         side the light comes from says the same thing in the picture's own
+         vocabulary, and says it more clearly.
+         `lift`, not `glow`: the moon is near-white and it is what lights
+         these. The amber belongs to the gas, and §D says it is the picture's
+         only warm colour — a sky full of it undoes the whole cold palette. */
+      g.globalAlpha = 0.20;
+      g.fillStyle = v.lift;
+      const rim = Math.min(2, c.h);
+      g.fillRect(qx, below ? c.top + c.h - rim : c.top, CLOUD_STEP, rim);
+    }
   }
   g.restore();
 }

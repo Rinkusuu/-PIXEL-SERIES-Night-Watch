@@ -1,12 +1,13 @@
 import type { AmbientValues } from '../ambient/types';
 import { horizon } from './horizon';
 import { skyline, type Block } from './city';
-import { drawStatic, inkFor } from './layers';
+import { drawGroundPlate, drawSkyPlate, inkFor } from './layers';
 import { drawWalker } from './figure';
 import { drawFog } from './fog';
 import { drawShafts } from './shafts';
 import { drawLamps, drawPointerLantern, lampSpots, moonPos } from './bloom';
 import { createLife } from './life';
+import { drawClouds, drawStars } from './sky';
 import type { Season } from './season';
 import type { LampSpot } from './water';
 import { SQUASH, createWater, stoneSkip } from './water';
@@ -72,6 +73,16 @@ export type FrameInput = {
 };
 
 export function createWorldRenderer() {
+  /**
+   * TWO plates, with the live sky between them.
+   *
+   * `skyPlate` is the gradient, the gas dome and the moon; `plate` is
+   * everything in front of the sky, on a transparent canvas. Stars and cloud
+   * banks are drawn between the two every frame, so they can move while the
+   * city still stands in front of them — which is the whole reason for the
+   * split. One plate meant either a frozen sky or a rebuild every frame.
+   */
+  let skyPlate: HTMLCanvasElement | null = null;
   let plate: HTMLCanvasElement | null = null;
   let mirror: HTMLCanvasElement | null = null;
   let blocks: Block[] = [];
@@ -139,13 +150,23 @@ export function createWorldRenderer() {
         blocks = skyline(w, hz.cityTop, hz.cityBot, Math.round(w * 31 + h), 1, hz.landmarkTop);
       }
 
+      const sv = skyPlate ?? document.createElement('canvas');
+      sv.width = w;
+      sv.height = h;
+      const sg = sv.getContext('2d');
+      if (sg) {
+        sg.clearRect(0, 0, w, h);
+        drawSkyPlate(sg, w, hz, v, progress, blocks, weather);
+      }
+      skyPlate = sv;
+
       const cv = plate ?? document.createElement('canvas');
       cv.width = w;
       cv.height = h;
       const g = cv.getContext('2d');
       if (g) {
         g.clearRect(0, 0, w, h);
-        drawStatic(g, w, hz, v, progress, blocks, weather);
+        drawGroundPlate(g, w, hz, v, progress, blocks, weather);
       }
       plate = cv;
 
@@ -163,6 +184,12 @@ export function createWorldRenderer() {
         const mg = mv.getContext('2d');
         if (mg) {
           mg.clearRect(0, 0, w, mh);
+          // Both plates, in order. The live sky is deliberately NOT in here:
+          // a reflection rebuilt once per plate would freeze whatever the
+          // clouds happened to be doing at that instant and then hold it,
+          // which is worse than a river that reflects the sky's colour
+          // without its weather.
+          mg.drawImage(sv, 0, srcTop, w, mh, 0, 0, w, mh);
           mg.drawImage(cv, 0, srcTop, w, mh, 0, 0, w, mh);
         }
         mirror = mv;
@@ -193,6 +220,16 @@ export function createWorldRenderer() {
     // leaves alone; a black fill would be screened too and lift the whole
     // frame off its own black.
     glow.clearRect(0, 0, w, h);
+
+    /* Sky, then what is IN the sky, then everything in front of it.
+       The stars twinkle and the banks drift here, between two cached images —
+       which is the only place they can, because they have to move and the
+       city has to occlude them. */
+    if (skyPlate) target.drawImage(skyPlate, 0, 0);
+    const moonAt = moonPos(w, hz, progress);
+    const skySeed = Math.round(w * 13 + hz.h);
+    drawStars(target, w, hz, v, moonAt, fx.fogScale, timeMs, skySeed);
+    drawClouds(target, w, hz, v, moonAt, timeMs, motion, skySeed);
     if (plate) target.drawImage(plate, 0, 0);
 
     water.draw(target, w, hz, v, mirror, lamps, timeMs, motion, notch);

@@ -48,7 +48,16 @@ export function facets(
  * Not one composition number is computed here — they all come from `hz`. Not one
  * depth value either — they all come from `valueLadder`.
  */
-export function drawStatic(
+/**
+ * The sky, and only the sky: the dithered gradient, the gas dome, the moon.
+ *
+ * Its own plate now, because the things that go BETWEEN it and the city —
+ * stars and cloud banks — have to be redrawn every frame and the city has to
+ * stand in front of them. Two cached images with a live pass sandwiched
+ * between is the cheapest way to have both; everything here still rebuilds
+ * only when the palette, the weather or the frame actually move.
+ */
+export function drawSkyPlate(
   g: CanvasRenderingContext2D,
   w: number,
   hz: Horizon,
@@ -82,19 +91,38 @@ export function drawStatic(
   }
   g.fillRect(0, 0, w, hz.waterTop);
 
-  const ink = inkFor(v);
-  const wet = weather === 'rain' ? 0.18 : 0;
-  const ladder = valueLadder(v, wet);
-
-  // 1b — what is IN the sky. Stars, the gas dome over the city, and the cloud
-  //      banks, in that order back to front. The moon's position comes from
-  //      bloom.ts rather than a second guess here: the clouds are lit from it,
-  //      and a rim on the wrong side is worse than no rim.
+  // 1b — the gas dome and the moon. The stars and the cloud banks used to be
+  //      here too and are drawn live now, over this plate and under the next
+  //      one — see `drawStars` and `drawClouds`. The moon's position comes
+  //      from bloom.ts rather than a second guess here: the clouds are lit
+  //      from it, and a rim on the wrong side is worse than no rim.
   const fx = effectsFor(weather);
   drawSky(
     g, w, hz, v, blocks, moonPos(w, hz, progress), MOON_BASE_R * fx.moonScale,
-    fx.fogScale, ink, Math.round(w * 13 + hz.h),
+    fx.fogScale, inkFor(v), Math.round(w * 13 + hz.h),
   );
+
+}
+
+/**
+ * Everything in FRONT of the sky: the three skylines, the far bank, the
+ * bridge, the near bank and the deck.
+ *
+ * Drawn onto a transparent canvas, so what shows through the gaps between the
+ * towers is whatever the live sky pass has put there.
+ */
+export function drawGroundPlate(
+  g: CanvasRenderingContext2D,
+  w: number,
+  hz: Horizon,
+  v: AmbientValues,
+  progress: number,
+  blocks: readonly Block[],
+  weather: Weather,
+): void {
+  const ink = inkFor(v);
+  const wet = weather === 'rain' ? 0.18 : 0;
+  const ladder = valueLadder(v, wet);
 
   // 2 — the band BEHIND the skyline. Its own seed, so its towers land between
   //     the near ones rather than behind them, and a much paler fill: the whole

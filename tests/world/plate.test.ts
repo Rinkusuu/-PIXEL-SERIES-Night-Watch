@@ -5,7 +5,7 @@ import { resolve } from '../../src/ambient/interpolate';
 import { NIGHT_KEYS } from '../../src/ambient/keyframes';
 import { gradesFor } from '../../src/ambient/grade';
 import { countingCtx } from '../helpers/counting-ctx';
-import { drawStatic } from '../../src/world/layers';
+import { drawGroundPlate, drawSkyPlate } from '../../src/world/layers';
 import { horizon } from '../../src/world/horizon';
 import { skyline } from '../../src/world/city';
 
@@ -69,15 +69,20 @@ describe('plate caching', () => {
 
 describe('the plate stays affordable', () => {
   it('builds the whole world inside its call budget', () => {
-    // The plate is cached, so per-frame cost is nil — but it IS rebuilt on
-    // resize, and that is what a hitch feels like. The bound below was measured
-    // from the finished code and then raised by about 15%; a bound picked by
-    // guess is a test that cannot fail.
+    // The plates are cached, so per-frame cost is nil — but they ARE rebuilt
+    // on resize, and that is what a hitch feels like. The bound below was
+    // measured from the finished code and then raised by about 15%; a bound
+    // picked by guess is a test that cannot fail.
+    //
+    // Both plates together, because the budget is about what a resize costs
+    // and a resize rebuilds both. The split into sky and ground moved work
+    // between them; it did not remove any.
     const hz = horizon(900, 594);
     const v = resolve(NIGHT_KEYS, 0.62, gradesFor(['calm']));
     const blocks = skyline(1440, hz.cityTop, hz.cityBot, 31);
     const { g, calls } = countingCtx();
-    drawStatic(g, 1440, hz, v, 0.62, blocks, 'clear');
+    drawSkyPlate(g, 1440, hz, v, 0.62, blocks, 'clear');
+    drawGroundPlate(g, 1440, hz, v, 0.62, blocks, 'clear');
     expect(calls()).toBeLessThan(BUDGET);
   });
 });
