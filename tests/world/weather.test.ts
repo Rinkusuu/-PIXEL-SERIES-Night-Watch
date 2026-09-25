@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BARGE_CROSS_MS, BARGE_PERIOD_MS, BIRD_COUNT, bargeAt, birdAt, effectsFor, weatherFor,
+  BARGE_CROSS_MS, BARGE_PERIOD_MS, BIRD_COUNT, WHERRY_CROSS_MS, WHERRY_PERIOD_MS, bargeAt, birdAt, effectsFor, weatherFor, wherryAt,
 } from '../../src/world/weather';
 import { drawWeather } from '../../src/world/weather';
 import { horizon } from '../../src/world/horizon';
@@ -168,5 +168,74 @@ describe('rain', () => {
 
   it('still never starts a drop below the frame', () => {
     expect(Math.max(...heads())).toBeLessThanOrEqual(hz.h);
+  });
+});
+
+describe('the river has traffic on it', () => {
+  /**
+   * Measured before this: ninety seconds of barge in every nine hundred is a
+   * vessel on screen ten per cent of the time — three barges over a
+   * fifty-minute watch, and a lot of empty river. The walker was already
+   * present forty-three per cent of the time and the birds nearly always, so
+   * the river was the thin part and the only part worth adding to.
+   */
+  const presence = (at: (ms: number) => number | null, period: number) => {
+    let seen = 0;
+    const N = 4000;
+    for (let i = 0; i < N; i++) if (at((i / N) * period) !== null) seen++;
+    return seen / N;
+  };
+
+  it('keeps something on the water a good part of the time', () => {
+    const barge = presence(bargeAt, BARGE_PERIOD_MS);
+    const wherry = presence(wherryAt, WHERRY_PERIOD_MS);
+    expect(barge).toBeGreaterThan(0.12);
+    expect(wherry).toBeGreaterThan(0.12);
+    // But not a parade. An empty river is part of the picture too.
+    expect(barge + wherry).toBeLessThan(0.55);
+  });
+
+  it('sends them opposite ways', () => {
+    const dir = (at: (ms: number) => number | null, cross: number) => {
+      const a = at(cross * 0.2)!;
+      const b = at(cross * 0.8)!;
+      return Math.sign(b - a);
+    };
+    expect(dir(bargeAt, BARGE_CROSS_MS)).toBe(1);
+    expect(dir(wherryAt, WHERRY_CROSS_MS)).toBe(-1);
+  });
+
+  /**
+   * Ten and seven do not divide, so over an hour they drift in and out of
+   * step: sometimes the river is empty, sometimes it carries one boat, and
+   * occasionally two pass each other. A period that divided evenly would turn
+   * that into a timetable.
+   */
+  it('does not put them on a timetable', () => {
+    expect(BARGE_PERIOD_MS % WHERRY_PERIOD_MS).not.toBe(0);
+    expect(WHERRY_PERIOD_MS % BARGE_PERIOD_MS).not.toBe(0);
+
+    let both = 0;
+    let neither = 0;
+    let one = 0;
+    const span = BARGE_PERIOD_MS * WHERRY_PERIOD_MS / 60_000;
+    for (let i = 0; i < 6000; i++) {
+      const t = (i / 6000) * span;
+      const n = (bargeAt(t) !== null ? 1 : 0) + (wherryAt(t) !== null ? 1 : 0);
+      if (n === 2) both++; else if (n === 0) neither++; else one++;
+    }
+    expect(both).toBeGreaterThan(0);
+    expect(one).toBeGreaterThan(0);
+    expect(neither).toBeGreaterThan(0);
+  });
+
+  it('carries each of them right across the frame and off it', () => {
+    for (const [at, cross] of [[bargeAt, BARGE_CROSS_MS], [wherryAt, WHERRY_CROSS_MS]] as const) {
+      const start = at(0)!;
+      const end = at(cross - 1)!;
+      // Both ends off-frame, so neither appears or vanishes in view.
+      expect(Math.min(start, end)).toBeLessThan(0);
+      expect(Math.max(start, end)).toBeGreaterThan(1);
+    }
   });
 });

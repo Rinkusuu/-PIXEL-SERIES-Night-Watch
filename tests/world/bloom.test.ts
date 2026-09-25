@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { horizon } from '../../src/world/horizon';
 import { openings, skyline } from '../../src/world/city';
 import { effectsFor } from '../../src/world/weather';
-import { drawLamps, drawPointerLantern, lampSpots, moonPos } from '../../src/world/bloom';
+import { bedtime, drawLamps, drawPointerLantern, lampSpots, moonPos } from '../../src/world/bloom';
 import { resolve } from '../../src/ambient/interpolate';
 import { NIGHT_KEYS } from '../../src/ambient/keyframes';
 import { gradesFor } from '../../src/ambient/grade';
@@ -311,5 +311,74 @@ describe('two surfaces', () => {
     const glow = spy();
     drawPointerLantern(glow.ctx, v, null, 0, 1);
     expect(glow.calls).toHaveLength(0);
+  });
+});
+
+describe('the city goes to bed', () => {
+  const lit = (p: number) => new Set(
+    lampSpots(1440, hz, blocks, p, effectsFor('clear'), moonPos(1440, hz, p))
+      .filter((s) => s.kind === 'window' && s.lit)
+      .map((s) => `${s.x},${s.y}`),
+  );
+
+  /**
+   * The half of the night that fills. A window that blinked off because its
+   * neighbour lit would make the whole city read as static.
+   */
+  it('only ever adds windows before the peak', () => {
+    let prev = lit(0);
+    for (let p = 0.04; p <= 0.62; p += 0.04) {
+      const now = lit(p);
+      for (const k of prev) expect(now.has(k)).toBe(true);
+      prev = now;
+    }
+  });
+
+  /**
+   * The half that empties, and the point of the whole change: ONE window going
+   * out is an event. Forty going out together is a lighting change, and the
+   * eye reads a lighting change as the weather rather than as people.
+   *
+   * It was driven by the lamp count — an integer from one to fourteen — so
+   * fourteen steps across a fifty-minute watch each flipped a whole batch.
+   */
+  it('puts them out a few at a time, not in batches', () => {
+    let prev = lit(0.62);
+    const perStep: number[] = [];
+    for (let p = 0.625; p <= 1.0001; p += 0.005) {
+      const now = lit(p);
+      let out = 0;
+      for (const k of prev) if (!now.has(k)) out++;
+      perStep.push(out);
+      prev = now;
+    }
+    /* Relative to this scene's own peak, not an absolute count. The first
+       version of this asserted "more than twenty", which was measured from a
+       1440x900 browser frame and has nothing to do with how many windows the
+       test's smaller skyline happens to carry. A threshold copied from another
+       scene is a threshold that fails for being right. */
+    const peak = lit(0.62).size;
+    const total = perStep.reduce((a, b) => a + b, 0);
+    expect(total).toBeGreaterThan(peak * 0.3);
+    // Nine seconds of watch per step. A batch would show up here at once.
+    expect(Math.max(...perStep)).toBeLessThanOrEqual(6);
+    // And spread out, not all in one burst near the end.
+    expect(perStep.filter((n) => n > 0).length).toBeGreaterThan(total / 3);
+  });
+
+  /** Some rooms are still burning at dawn. Nobody puts a household out. */
+  it('leaves part of the city lit at dawn', () => {
+    const peak = lit(0.62).size;
+    const dawn = lit(1).size;
+    expect(dawn).toBeGreaterThan(0);
+    expect(dawn).toBeLessThan(peak / 2);
+  });
+
+  it('gives every window its own hour, and some none at all', () => {
+    const hours = Array.from({ length: 400 }, (_, i) => bedtime(i));
+    expect(Math.min(...hours)).toBeGreaterThanOrEqual(0.62);
+    // A third of them fall past the end of the night and never come due.
+    expect(hours.filter((b) => b > 1).length).toBeGreaterThan(40);
+    expect(new Set(hours).size).toBeGreaterThan(300);
   });
 });

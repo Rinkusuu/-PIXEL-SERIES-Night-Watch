@@ -89,8 +89,38 @@ export function effectsFor(w: Weather): WeatherFx {
  */
 const REFLECT_SLICES = 6;
 
-export const BARGE_PERIOD_MS = 15 * 60_000;
+/**
+ * Fifteen minutes, once. Measured: ninety seconds of crossing in every nine
+ * hundred is a barge on screen ten per cent of the time, which over a
+ * fifty-minute watch is three barges and a lot of empty river. The walker is
+ * present forty-three per cent of the time and the birds nearly always; the
+ * river was the thin part.
+ */
+export const BARGE_PERIOD_MS = 10 * 60_000;
 export const BARGE_CROSS_MS = 90_000;
+
+/**
+ * A wherry, going the other way.
+ *
+ * The Thames was not a road with one lorry on it. Small craft crossed it all
+ * night — watermen ferrying between stairs — and a river with a single vessel
+ * that always travels the same way reads as a conveyor belt rather than as
+ * water with people on it.
+ *
+ * Her period is deliberately NOT a multiple of the barge's. At ten and seven
+ * they drift in and out of step over an hour, so sometimes the river is empty,
+ * sometimes it has one boat on it, and occasionally two pass each other. A
+ * period that divided evenly would make that a timetable.
+ */
+export const WHERRY_PERIOD_MS = 7 * 60_000;
+export const WHERRY_CROSS_MS = 62_000;
+
+/** Right to left, so she is plainly not the barge seen again. */
+export function wherryAt(nowMs: number): number | null {
+  const phase = ((nowMs % WHERRY_PERIOD_MS) + WHERRY_PERIOD_MS) % WHERRY_PERIOD_MS;
+  if (phase >= WHERRY_CROSS_MS) return null;
+  return 1.12 - (phase / WHERRY_CROSS_MS) * 1.26;
+}
 
 /**
  * Driven by the wall clock, not by session progress. The river does not care
@@ -311,6 +341,66 @@ export function drawWeather(
     g.restore();
     if (Math.floor(timeMs / 400) !== Math.floor((timeMs - 16) / 400)) {
       water.ring(x + bw, y + bh, 0.7);
+    }
+  }
+
+  /* 2b — the wherry, crossing the other way.
+     Much smaller and much simpler than the lighter: at this distance she is a
+     low hull, a waterman bent over his oars and a lantern on the stern, and
+     anything more would be detail nobody can resolve. She sits NEARER than the
+     barge — further down the water band — so the two read at different
+     distances instead of as two of the same boat on one line. */
+  const wx = motion === 0 ? null : wherryAt(timeMs);
+  if (wx !== null) {
+    const x = wx * w;
+    const y = hz.waterTop + (hz.waterBot - hz.waterTop) * 0.66;
+    const bw = Math.max(26, w * 0.032);
+    const bh = Math.max(4, bw * 0.16);
+    const wl = y + bh;
+
+    g.save();
+    g.fillStyle = v.deep;
+    // A sheer line, not a rectangle: both ends lift out of the water. A flat
+    // box at this size is a crate, and a crate does not float.
+    g.beginPath();
+    g.moveTo(x, y + bh * 0.3);
+    g.lineTo(x + bw * 0.18, y + bh);
+    g.lineTo(x + bw * 0.82, y + bh);
+    g.lineTo(x + bw, y + bh * 0.3);
+    g.lineTo(x + bw * 0.9, y);
+    g.lineTo(x + bw * 0.1, y);
+    g.closePath();
+    g.fill();
+    // The waterman, and the oar he is pulling. Three pixels of back and a
+    // diagonal is the whole of a man rowing at this range.
+    const rowT = Math.sin(timeMs / 900) * motion;
+    g.fillRect(Math.round(x + bw * 0.42), Math.round(y - bh * 0.9), 2, Math.round(bh));
+    g.fillRect(
+      Math.round(x + bw * 0.42 + rowT * 3), Math.round(y + bh * 0.2),
+      Math.max(3, Math.round(bw * 0.22)), 1,
+    );
+    g.restore();
+
+    // Her stern lantern, and its own smear on the water. The barge carries a
+    // bow light; putting the same light in the same place on both would say
+    // they are the same vessel.
+    const lx = Math.round(x + bw * 0.06);
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+    g.globalAlpha = 0.85;
+    g.fillStyle = v.glow;
+    g.fillRect(lx, Math.round(y - bh * 0.4), 2, 2);
+    g.globalAlpha = 0.16;
+    for (let k = 1; k <= 7; k++) {
+      const ry = wl + k * 1.5;
+      if (ry >= hz.waterBot) break;
+      g.globalAlpha = 0.16 * (1 - k / 7);
+      g.fillRect(lx - 1, Math.round(ry), 3, 1);
+    }
+    g.restore();
+
+    if (Math.floor(timeMs / 520) !== Math.floor((timeMs - 16) / 520)) {
+      water.ring(x, y + bh, 0.4);
     }
   }
 

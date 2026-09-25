@@ -18,8 +18,19 @@ const TOTAL_LAMPS = 14;
  */
 const WINDOW_LIT_PEAK = 0.12;
 
-/** How much of that peak still burns at the quietest hour. */
+/** How much of that peak already burns when the watch begins. */
 const WINDOW_LIT_FLOOR = 0.35;
+
+/**
+ * The hour a given window goes dark, in night-progress.
+ *
+ * Nothing goes to bed before the peak — that is the deepest, most-lit part of
+ * the night and the whole shape of the thing is that it fills and then empties.
+ * The range runs past 1 so that a third of the city never goes out at all.
+ */
+export function bedtime(i: number): number {
+  return 0.62 + rand(i + 7777) * 0.55;
+}
 
 /**
  * Windows and lamps light up through the evening and go out toward dawn. Peak is
@@ -99,20 +110,21 @@ export function lampSpots(
     }
   }
 
-  // `n` counts LAMPS, and it was calibrated when a whole building carried one
-  // window. A city now offers hundreds, so a flat fourteen would leave it 97%
-  // dark. Windows scale with how many there are; the gas standards do not.
-  //
-  // And they keep a floor. A lamplighter puts the gas out; nobody puts a
-  // household out, so the windows thin toward dawn rather than going dark.
-  const curve = WINDOW_LIT_FLOOR + (1 - WINDOW_LIT_FLOOR) * (n / TOTAL_LAMPS);
-  const frac = WINDOW_LIT_PEAK * curve;
+  /* How many windows are burning, as a CONTINUOUS reading of the night.
+     It used to be driven by `n`, the lamp count — an integer between one and
+     fourteen. Fourteen steps across a fifty-minute watch, and every step
+     flipped a whole batch of windows at once, so the city dimmed in stages
+     like a dimmer switch rather than like a street where people go to bed.
+     `n` still drives the gas, which genuinely does come up in stages: a
+     lamplighter walks the row with a pole. Households do not. */
+  const rising = Math.min(1, progress / 0.62);
+  const frac = WINDOW_LIT_PEAK * (WINDOW_LIT_FLOOR + (1 - WINDOW_LIT_FLOOR) * rising);
   for (let i = 0; i < candidates.length; i++) {
     const c = candidates[i]!;
     // Every opening holds a fixed lottery ticket, drawn from a pure function of
     // its index — so it is stable frame to frame, and the lit set only ever
-    // GROWS as the night deepens. A window never blinks off because its
-    // neighbour lit.
+    // GROWS through the first half of the night. A window never blinks off
+    // because its neighbour lit.
     //
     // The threshold carries a per-BUILDING term because a household lights more
     // than one window. Even per-window noise gives a uniform sprinkle, and a
@@ -120,6 +132,16 @@ export function lampSpots(
     // averages exactly 1, so clustering costs no overall brightness.
     const wake = 0.15 + rand(c.block * 7 + 9001) * 1.70;
     if (rand(i + 1) >= frac * wake) continue;
+    /* And each one keeps its OWN bedtime.
+       This is the difference between a city that dims and a city that goes to
+       bed. One window going out is an event; forty going out together is a
+       lighting change, and the eye reads a lighting change as the weather
+       rather than as people.
+       Spread past the end of the night on purpose: a third of these never
+       reach their bedtime at all, which is the floor the old flat curve was
+       there to provide. A lamplighter puts the gas out; nobody puts a
+       household out, and some rooms are still burning at dawn. */
+    if (progress > bedtime(i)) continue;
     // Skewed LOW: most rooms are dim and a few are blazing, which is what a
     // street of windows actually looks like. A flat spread would only move the
     // uniformity from one value to a slightly noisier one.

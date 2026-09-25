@@ -112,6 +112,11 @@ export function createWorldRenderer() {
   let lastTime = 0;
 
   function invalidate(): void {
+    // BOTH. The split into two plates left this nulling only one of them, so
+    // an explicit throw-away kept the old sky at the old size. The staleness
+    // check below happens to catch a resize anyway, which is exactly why a
+    // bug like this sits there.
+    skyPlate = null;
     plate = null;
   }
 
@@ -207,7 +212,12 @@ export function createWorldRenderer() {
     }
 
     const notch = clock.notch();
-    const dt = lastTime === 0 ? 16 : Math.min(64, timeMs - lastTime);
+    // Clamped at BOTH ends. The cap was always here; the floor was not, and a
+    // clock that ever went backwards handed a negative `dt` to the water,
+    // which turned into a negative ripple radius and threw `IndexSizeError`
+    // out of a canvas call. rAF is monotonic so it should not happen — but
+    // "should not" is what a clamp is for, and it cost one call.
+    const dt = lastTime === 0 ? 16 : Math.max(0, Math.min(64, timeMs - lastTime));
     lastTime = timeMs;
     water.update(dt, motion);
 

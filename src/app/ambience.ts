@@ -189,47 +189,61 @@ export function createAmbience() {
   let armed: (() => void) | null = null;
 
   /**
-   * Start — or arm, and start at the first touch of the page.
+   * Is the browser willing to let us start RIGHT NOW?
    *
-   * Pressing the switch is a gesture and resumes immediately. A tab RELOADED
-   * with the sound remembered on is not: the browser refuses the resume and
-   * logs a warning for it, which is what the first version of this did on
-   * every load. Dropping the preference instead would be worse — the switch
-   * would read ON over silence.
+   * Transient user activation is exactly this question, and asking it is the
+   * only way to avoid constructing a context we are not allowed to run —
+   * which is itself what Chrome logs the warning for, before anyone calls
+   * `resume`. The first version of this armed a resume but still built the
+   * context on mount, so a tab reloaded with the sound remembered on logged
+   * six warnings before it had done anything at all.
    *
-   * So the preference is kept and the sound waits. The next click, key or
-   * scroll anywhere on the page brings it in, on the same slow fade it would
-   * have had. Nothing announces this; you press start, or press a key, and
-   * the river is simply there.
+   * I checked for those warnings after the first fix and saw none, because I
+   * had just switched the sound OFF to test the cold path. Verified under the
+   * wrong condition is not verified.
    */
-  function enable(vol = volume): boolean {
-    if (!build() || !ctx || !master) return false;
-    volume = vol;
-    glide(master.gain, volume, 1.8);
-
-    if (ctx.state === 'running') return true;
-
-    void ctx.resume();
-    disarm();
-    const wake = () => {
-      if (!ctx) return;
-      void ctx.resume().then(() => { if (master) glide(master.gain, volume, 1.8); });
-      disarm();
-    };
-    for (const ev of ['pointerdown', 'keydown', 'wheel'] as const) {
-      window.addEventListener(ev, wake, { once: true, passive: true });
-    }
-    armed = () => {
-      for (const ev of ['pointerdown', 'keydown', 'wheel'] as const) {
-        window.removeEventListener(ev, wake);
-      }
-    };
-    return true;
+  function canStartNow(): boolean {
+    const ua = (navigator as unknown as { userActivation?: { isActive?: boolean } }).userActivation;
+    // No support: assume not, and wait for a gesture we can see. Waiting is
+    // recoverable; a warning on every load is not.
+    return ua?.isActive === true;
   }
 
   function disarm(): void {
     armed?.();
     armed = null;
+  }
+
+  /**
+   * Wait for the first touch of the page, then start.
+   *
+   * A tab reloaded with the sound on is not a gesture. Dropping the preference
+   * instead would be worse — the switch would read ON over silence — so the
+   * preference is kept and the sound waits. The next click, key or scroll
+   * anywhere brings it in on the same slow fade it would have had. Nothing
+   * announces it: you press start, or press a key, and the river is there.
+   */
+  function arm(): void {
+    disarm();
+    const wake = () => {
+      disarm();
+      if (!build() || !ctx || !master) return;
+      void ctx.resume().then(() => { if (master) glide(master.gain, volume, 1.8); });
+    };
+    const events = ['pointerdown', 'keydown', 'wheel'] as const;
+    for (const ev of events) window.addEventListener(ev, wake, { once: true, passive: true });
+    armed = () => { for (const ev of events) window.removeEventListener(ev, wake); };
+  }
+
+  /** Start if we may, and otherwise wait until we may. */
+  function enable(vol = volume): boolean {
+    volume = vol;
+    if (!canStartNow()) { arm(); return false; }
+    disarm();
+    if (!build() || !ctx || !master) return false;
+    void ctx.resume();
+    glide(master.gain, volume, 1.8);
+    return true;
   }
 
   function disable(): void {
