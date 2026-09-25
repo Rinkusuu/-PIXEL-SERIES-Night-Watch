@@ -47,9 +47,10 @@ written at the top of `src/app/copy.ts` and `tests/app/copy.test.ts` enforces it
 
 ## Design
 
-- Spec: `docs/superpowers/specs/2026-07-27-night-watch-design.md`
-- Scene spec: `docs/superpowers/specs/2026-07-28-river-scene-design.md`
-- Scene queue: `docs/superpowers/specs/2026-08-01-scene-detail-queue.md`
+The plans and specs this was built from have been removed. They had become a
+list of things not to do, and the useful half of what was in them — the reasons
+— is in the code beside the decisions it explains, where it cannot go stale
+without someone noticing. `git log` still has them if they are ever wanted.
 
 Two rendering layers that never mix: an engraved `<canvas>` world at full
 resolution, and pixel-glass DOM chrome on a 4px grid. They share one thing — the
